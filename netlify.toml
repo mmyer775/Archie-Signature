@@ -7,6 +7,14 @@
   NODE_VERSION = "18"
   SECRETS_SCAN_OMIT_KEYS = "VITE_OFFICE_NAME"
 
+# Route /api/chat to the Netlify function
+# MUST come before the SPA catchall below — order matters
+[[redirects]]
+  from = "/api/chat"
+  to = "/.netlify/functions/chat"
+  status = 200
+
+# SPA fallback — serves index.html for all unmatched paths
 [[redirects]]
   from = "/*"
   to = "/index.html"
