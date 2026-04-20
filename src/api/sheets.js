@@ -1,8 +1,15 @@
 // ============================================================
-// ARCHIE API CLIENT (v2.0)
+// ARCHIE API CLIENT (v2.1)
 // All data goes through the Apps Script web app.
 // No direct Google Sheets API calls — removes the need for
 // Sheets scope in OAuth, and keeps each office isolated.
+//
+// v2.1: switched POST content-type from text/plain to
+// application/x-www-form-urlencoded. Apps Script's redirect
+// chain drops the body on text/plain POSTs in some browsers
+// and curl versions, causing "Page Not Found" responses.
+// Using form-urlencoded makes it a "simple request" that
+// Apps Script reliably delivers through the redirect.
 // ============================================================
 
 import { CONFIG } from '../config';
@@ -20,14 +27,17 @@ async function callApi(action, payload = {}, userEmail = null) {
   const body = { action, ...payload };
   if (userEmail) body.userEmail = userEmail.toLowerCase().trim();
 
+  // Send as x-www-form-urlencoded with a single "payload" field containing
+  // the JSON blob. Apps Script surfaces this as e.parameter.payload on the
+  // server side. No preflight (simple request), no body-loss on redirect.
+  const formBody = 'payload=' + encodeURIComponent(JSON.stringify(body));
+
   let response;
   try {
     response = await fetch(APPS_SCRIPT_URL, {
       method:  'POST',
-      // NOTE: Apps Script web apps don't handle preflight CORS for JSON Content-Type.
-      // Using text/plain avoids the preflight; Apps Script parses the body regardless.
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body:    JSON.stringify(body),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body:    formBody,
       redirect: 'follow',
     });
   } catch (err) {
