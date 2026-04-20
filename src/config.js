@@ -4,9 +4,8 @@
 
 export const CONFIG = {
   googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-  officeName:     import.meta.env.VITE_OFFICE_NAME || 'Office',
+  officeName: import.meta.env.VITE_OFFICE_NAME || 'Signature',
   officeLegalName: import.meta.env.VITE_OFFICE_LEGAL_NAME,
-  anthropicKey:   import.meta.env.VITE_ANTHROPIC_API_KEY,
   sheets: {
     roster:    import.meta.env.VITE_ROSTER_SHEET_ID,
     orders:    import.meta.env.VITE_ORDERS_SHEET_ID,
