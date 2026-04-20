@@ -1,12 +1,18 @@
 // ============================================================
-// useAuth — Authentication hook
-// Manages Google OAuth flow and ROSTER lookup
+// useAuth — Authentication hook (v2.0)
+// - Google OAuth for identity only (openid/email/profile — NO Sheets scope)
+// - All data access goes through Apps Script web app (via sheets.js)
+// - Session stores user's verified email; sheets.js uses it for auth on every call
 // ============================================================
 
 import { useState, useEffect, useCallback } from 'react';
 import { useGoogleLogin }                   from '@react-oauth/google';
-import { lookupUserInRoster, fetchRoster, fetchNumbers, fetchOrders } from '../api/sheets';
-import { CONFIG }                           from '../config';
+import {
+  lookupUserInRoster,
+  fetchRoster,
+  fetchNumbers,
+  fetchOrders,
+} from '../api/sheets';
 
 const SESSION_KEY = 'archie_session';
 
@@ -23,19 +29,19 @@ function getWeekBounds() {
   return { mon, sun };
 }
 
-async function buildTeam(teamNames, numbersSheetId, ordersSheetId, accessToken) {
+async function buildTeam(teamNames, userEmail) {
   if (!teamNames || teamNames.length === 0) return [];
 
   const today        = new Date().toLocaleDateString('en-US');
   const { mon, sun } = getWeekBounds();
 
-  // Fetch numbers and orders in parallel
+  // Fetch numbers and orders in parallel via Apps Script
   let allNumbers = [];
   let allOrders  = [];
   try {
     [allNumbers, allOrders] = await Promise.all([
-      numbersSheetId ? fetchNumbers(numbersSheetId, accessToken) : Promise.resolve([]),
-      ordersSheetId  ? fetchOrders(ordersSheetId,  accessToken) : Promise.resolve([]),
+      fetchNumbers(userEmail),
+      fetchOrders(userEmail),
     ]);
   } catch (e) {
     console.warn('Could not load team data:', e.message);
@@ -44,14 +50,14 @@ async function buildTeam(teamNames, numbersSheetId, ordersSheetId, accessToken) 
   return teamNames.map((name, i) => {
     const normName = name.toLowerCase().trim();
 
-    // ── Daily numbers (from NUMBERS sheet) ──────────────────
+    // ── Daily numbers ─────────────────────────────────────────
     const todayRow = allNumbers.find(
-      n => n.repName.toLowerCase().trim() === normName && n.date === today
+      n => (n.repName || '').toLowerCase().trim() === normName && n.date === today
     );
 
-    // ── Streak (consecutive days with submissions) ───────────
+    // ── Streak (consecutive days with submissions) ────────────
     const repRows = allNumbers
-      .filter(n => n.repName.toLowerCase().trim() === normName)
+      .filter(n => (n.repName || '').toLowerCase().trim() === normName)
       .sort((a, b) => new Date(b.date) - new Date(a.date));
 
     let streak = 0;
@@ -67,9 +73,9 @@ async function buildTeam(teamNames, numbersSheetId, ordersSheetId, accessToken) 
       }
     }
 
-    // ── Weekly orders (from ORDERS sheet) ───────────────────
+    // ── Weekly orders ────────────────────────────────────────
     const weekOrders = allOrders.filter(o => {
-      if (o.repName.toLowerCase().trim() !== normName) return false;
+      if ((o.repName || '').toLowerCase().trim() !== normName) return false;
       const d = new Date(o.orderDate);
       return !isNaN(d) && d >= mon && d <= sun;
     });
@@ -78,17 +84,15 @@ async function buildTeam(teamNames, numbersSheetId, ordersSheetId, accessToken) 
     const weekLines        = weekOrders.reduce((s, o) => s + (Number(o.lines) || 0), 0);
 
     return {
-      id:               i + 1,
+      id:           i + 1,
       name,
-      // Daily
-      houses:           todayRow?.houses      || 0,
-      talkTos:          todayRow?.talkTos     || 0,
-      saras:            todayRow?.saras       || 0,
-      sales:            todayRow?.closedSales || 0,
-      submitted:        !!todayRow,
+      houses:       todayRow?.houses      || 0,
+      talkTos:      todayRow?.talkTos     || 0,
+      saras:        todayRow?.saras       || 0,
+      sales:        todayRow?.closedSales || 0,
+      submitted:    !!todayRow,
       streak,
-      // Weekly
-      weekOrders:       weekUniqueOrders,
+      weekOrders:   weekUniqueOrders,
       weekLines,
     };
   });
@@ -99,6 +103,7 @@ export function useAuth() {
   const [user,   setUser]   = useState(null);
   const [error,  setError]  = useState(null);
 
+  // Restore session on mount
   useEffect(() => {
     const saved = sessionStorage.getItem(SESSION_KEY);
     if (saved) {
@@ -123,42 +128,41 @@ export function useAuth() {
       setError(null);
 
       try {
+        // ── Step 1: Get verified email from Google ──────────────────
         const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
           headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
         });
         const userInfo = await userInfoRes.json();
         if (!userInfo.email) throw new Error('Could not retrieve email from Google.');
 
-        const rosterEntry = await lookupUserInRoster(
-          userInfo.email,
-          CONFIG.sheets.roster,
-          tokenResponse.access_token
-        );
+        // ── Step 2: Look up user in this office's ROSTER (via Apps Script) ──
+        const rosterEntry = await lookupUserInRoster(userInfo.email);
 
         if (!rosterEntry) {
           setStatus('denied');
           return;
         }
 
-        const role = rosterEntry.role;
-        let teamNames = [];
+        const role  = rosterEntry.role;
+        const email = rosterEntry.email;
 
+        // ── Step 3: Build team list for managers / a_players ────────
+        let teamNames = [];
         if (role === 'a_player') {
           teamNames = rosterEntry.team
             ? rosterEntry.team.split(',').map(n => n.trim()).filter(Boolean)
             : [];
-          // Include the a-player themselves — they sell too
           if (rosterEntry.name && !teamNames.includes(rosterEntry.name)) {
             teamNames.unshift(rosterEntry.name);
           }
         } else if (['manager', 'captain', 'admin'].includes(role)) {
           try {
-            const allReps = await fetchRoster(CONFIG.sheets.roster, tokenResponse.access_token);
+            const allReps = await fetchRoster(email);
             teamNames = allReps
               .filter(r =>
-                r.office.toLowerCase() === rosterEntry.office.toLowerCase() &&
+                (r.office || '').toLowerCase() === (rosterEntry.office || '').toLowerCase() &&
                 r.status === 'active' &&
-                r.role === 'rep'
+                r.role   === 'rep'
               )
               .map(r => r.name)
               .filter(Boolean);
@@ -167,21 +171,20 @@ export function useAuth() {
           }
         }
 
+        // ── Step 4: Build team stats ────────────────────────────────
         let team = [];
         if (teamNames.length > 0) {
-          team = await buildTeam(
-            teamNames,
-            CONFIG.sheets.numbers,
-            CONFIG.sheets.orders,
-            tokenResponse.access_token
-          );
+          team = await buildTeam(teamNames, email);
         }
 
+        // ── Step 5: Persist session ─────────────────────────────────
+        // NOTE: We no longer store accessToken — the frontend never uses it
+        // to call Sheets directly. We store the verified email, which is
+        // what sheets.js sends to the Apps Script for auth on every call.
         const sessionUser = {
           ...rosterEntry,
           team,
-          picture:     userInfo.picture || null,
-          accessToken: tokenResponse.access_token,
+          picture: userInfo.picture || null,
         };
 
         const session = { user: sessionUser, timestamp: Date.now() };
@@ -201,11 +204,10 @@ export function useAuth() {
       setError('Google sign-in failed. Please try again.');
       setStatus('error');
     },
-    scope: [
-      'email',
-      'profile',
-      'https://www.googleapis.com/auth/spreadsheets',
-    ].join(' '),
+    // NO Sheets scope — only identity scopes.
+    // This eliminates the "Google hasn't verified this app" warning
+    // once you remove the Sheets scope from the OAuth consent screen.
+    scope: 'email profile openid',
   });
 
   const signOut = useCallback(() => {
