@@ -9,7 +9,6 @@
 // ============================================================
 
 import { useState, useEffect } from 'react';
-import { CONFIG } from '../config';
 import { fetchStruggles } from '../api/sheets';
 
 function timeAgo(dateStr) {
@@ -176,10 +175,10 @@ export function StrugglesFeed({ user }) {
 
   useEffect(() => {
     async function load() {
-      if (!user?.accessToken || !CONFIG.sheets.struggles) return;
+      if (!user?.email) return;
       try {
         setLoading(true);
-        const rows = await fetchStruggles(CONFIG.sheets.struggles, user.accessToken);
+        const rows = await fetchStruggles(user.email);
         setStruggles(rows);
       } catch (e) {
         setError(e.message);
@@ -188,7 +187,7 @@ export function StrugglesFeed({ user }) {
       }
     }
     load();
-  }, [user?.accessToken]);
+  }, [user?.email]);
 
   // A-player: only show team members, not themselves
   const isAPlayer = user?.role === 'a_player';

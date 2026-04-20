@@ -7,7 +7,6 @@ import { ArchieChat }    from '../components/ArchieChat';
 import { StrugglesFeed } from '../components/StrugglesFeed';
 import { A_PLAYER_TABS } from '../config';
 import { fetchOrders, fetchDDData } from '../api/sheets';
-import { CONFIG, ROLES } from '../config';
 
 const RATE_PER_LINE = 110;
 
@@ -277,15 +276,13 @@ function APlayerPaycheckView({ user }) {
 
   useEffect(() => {
     async function load() {
-      if (!user?.accessToken) return;
+      if (!user?.email) return;
       try {
         setLoading(true);
         setError(null);
         const [orderRows, ddRows] = await Promise.all([
-          fetchOrders(CONFIG.sheets.orders, user.accessToken),
-          CONFIG.sheets.master
-            ? fetchDDData(CONFIG.sheets.master, user.accessToken, null, CONFIG.officeLegalName)
-            : Promise.resolve([]),
+          fetchOrders(user.email),
+          fetchDDData(user.email),
         ]);
         setOrders(orderRows);
         setDDData(ddRows);
@@ -297,7 +294,7 @@ function APlayerPaycheckView({ user }) {
       }
     }
     load();
-  }, [user?.accessToken]);
+  }, [user?.email]);
 
   if (loading) return (
     <div className="fade-up">

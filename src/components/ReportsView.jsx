@@ -17,7 +17,6 @@ if (typeof document !== 'undefined' && !document.getElementById('archie-spin')) 
   s.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
   document.head.appendChild(s);
 }
-import { CONFIG } from '../config';
 import { fetchNumbers, fetchStruggles } from '../api/sheets';
 
 // ── Date helpers ──────────────────────────────────────────────
@@ -476,12 +475,12 @@ export function ReportsView({ user }) {
 
   useEffect(() => {
     async function load() {
-      if (!user?.accessToken) return;
+      if (!user?.email) return;
       try {
         setLoading(true); setError(null);
         const [numRows, strRows] = await Promise.all([
-          fetchNumbers(CONFIG.sheets.numbers, user.accessToken),
-          fetchStruggles(CONFIG.sheets.struggles, user.accessToken),
+          fetchNumbers(user.email),
+          fetchStruggles(user.email),
         ]);
         setNumbers(numRows);
         setStruggles(strRows);
@@ -492,7 +491,7 @@ export function ReportsView({ user }) {
       }
     }
     load();
-  }, [user?.accessToken]);
+  }, [user?.email]);
 
   const ref = new Date(refDate + 'T12:00:00');
   let from, to, rangeLabel;

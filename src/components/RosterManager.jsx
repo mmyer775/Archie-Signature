@@ -9,7 +9,6 @@
 // ============================================================
 
 import { useState, useEffect } from 'react';
-import { CONFIG, ROLES } from '../config';
 import { fetchRoster, addRepToRoster, updateRosterRow } from '../api/sheets';
 
 const ROLE_OPTIONS = ['rep', 'a_player', 'manager'];
@@ -237,10 +236,10 @@ export function RosterManager({ user }) {
   const [successMsg,    setSuccessMsg]    = useState('');
 
   const load = async () => {
-    if (!user?.accessToken) return;
+    if (!user?.email) return;
     try {
       setLoading(true); setError(null);
-      const rows = await fetchRoster(CONFIG.sheets.roster, user.accessToken);
+      const rows = await fetchRoster(user.email);
       setRoster(rows);
     } catch (e) {
       setError(e.message);
@@ -249,7 +248,7 @@ export function RosterManager({ user }) {
     }
   };
 
-  useEffect(() => { load(); }, [user?.accessToken]);
+  useEffect(() => { load(); }, [user?.email]);
 
   const activeRoster   = roster.filter(r => r.status !== 'inactive');
   const inactiveRoster = roster.filter(r => r.status === 'inactive');
@@ -266,11 +265,11 @@ export function RosterManager({ user }) {
     try {
       if (formData.rowIndex) {
         // Edit existing
-        await updateRosterRow(CONFIG.sheets.roster, user.accessToken, formData.rowIndex, formData);
+        await updateRosterRow(user.email, formData.rowIndex, formData);
         flash(`${formData.name} updated`);
       } else {
         // Add new
-        await addRepToRoster(CONFIG.sheets.roster, user.accessToken, formData);
+        await addRepToRoster(user.email, formData);
         flash(`${formData.name} added`);
       }
       setModal(null);

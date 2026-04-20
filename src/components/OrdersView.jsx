@@ -6,7 +6,6 @@
 
 import { useState, useEffect } from 'react';
 import { fetchOrders } from '../api/sheets';
-import { CONFIG } from '../config';
 import { OrderDetailModal } from './OrderDetailModal';
 
 const STATUS_COLORS = {
@@ -67,12 +66,11 @@ export function OrdersView({ user, repFilter = null, teamFilter = null }) {
   const [selectedReps, setSelectedReps] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
 
-  const ordersSheetId = CONFIG.sheets.orders;
-  const accessToken   = user?.accessToken;
+  const userEmail = user?.email;
 
   useEffect(() => {
-    if (!ordersSheetId || !accessToken) {
-      setError('Orders sheet not configured.');
+    if (!userEmail) {
+      setError('Not signed in.');
       setLoading(false);
       return;
     }
@@ -82,7 +80,7 @@ export function OrdersView({ user, repFilter = null, teamFilter = null }) {
 
     // If teamFilter (array) provided → fetch all, filter client-side
     // If repFilter (string) provided → pass to API for server-side filter
-    fetchOrders(ordersSheetId, accessToken, teamFilter ? null : repFilter)
+    fetchOrders(userEmail, teamFilter ? null : repFilter)
       .then(data => {
         const result = teamFilter
           ? data.filter(o => teamFilter.some(
@@ -97,7 +95,7 @@ export function OrdersView({ user, repFilter = null, teamFilter = null }) {
         setLoading(false);
         console.error('OrdersView error:', err);
       });
-  }, [ordersSheetId, accessToken, repFilter, JSON.stringify(teamFilter)]);
+  }, [userEmail, repFilter, JSON.stringify(teamFilter)]);
 
   // Show rep filter chips when manager sees all, or when a-player sees their team
   const showRepFilter = !repFilter || teamFilter;
@@ -144,7 +142,6 @@ export function OrdersView({ user, repFilter = null, teamFilter = null }) {
       <div className="section-header"><div><div className="section-title">All Orders</div><div className="section-subtitle">Error</div></div></div>
       <div className="card" style={{ borderColor: '#C4748A50' }}>
         <div style={{ color: '#C4748A', fontSize: 13 }}>❌ {error}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>Sheet ID: {ordersSheetId || 'MISSING from .env'}</div>
       </div>
     </div>
   );

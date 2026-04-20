@@ -8,7 +8,6 @@ import { StrugglesFeed } from '../components/StrugglesFeed';
 import { ReportsView }   from '../components/ReportsView';
 import { RosterManager } from '../components/RosterManager';
 import { fetchNumbers }  from '../api/sheets';
-import { CONFIG }        from '../config';
 
 // ── Office Dashboard ──────────────────────────────────────────
 
@@ -21,10 +20,10 @@ function OfficeDashboard({ user }) {
 
   useEffect(() => {
     async function load() {
-      if (!user?.accessToken || !CONFIG.sheets.numbers) return;
+      if (!user?.email) return;
       try {
         setLoading(true);
-        const rows = await fetchNumbers(CONFIG.sheets.numbers, user.accessToken);
+        const rows = await fetchNumbers(user.email);
         setNumbers(rows);
       } catch (e) {
         setError(e.message);
@@ -33,7 +32,7 @@ function OfficeDashboard({ user }) {
       }
     }
     load();
-  }, [user?.accessToken]);
+  }, [user?.email]);
 
   // Today's rows only
   const todayRows = numbers.filter(n => n.date === today);

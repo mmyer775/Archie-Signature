@@ -6,7 +6,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal }                from 'react-dom';
 import { fetchOrderDetail }            from '../api/sheets';
-import { CONFIG }                      from '../config';
 
 const STATUS_COLORS = {
   'Active':              '#A0C4B8',
@@ -46,16 +45,15 @@ export function OrderDetailModal({ order, user, onClose }) {
   const [error,   setError]   = useState(null);
   const fetchedRef = useRef(false);
 
-  const masterSheetId = CONFIG.sheets.master;
-  const accessToken   = user?.accessToken;
+  const userEmail = user?.email;
 
   useEffect(() => {
     // Use ref to prevent double-fetch from StrictMode
     if (fetchedRef.current) return;
-    if (!masterSheetId || !accessToken || !order) return;
+    if (!userEmail || !order) return;
     fetchedRef.current = true;
 
-    fetchOrderDetail(masterSheetId, accessToken, {
+    fetchOrderDetail(userEmail, {
       customer:  order.customer,
       repName:   order.repName,
       orderDate: order.orderDate,

@@ -14,7 +14,7 @@
 
 import { useState, useEffect } from 'react';
 import { fetchOrders, fetchDDData } from '../api/sheets';
-import { CONFIG, ROLES }            from '../config';
+import { ROLES }                    from '../config';
 
 const RATE_PER_LINE = 110;
 const MANAGER_RATE  = 230;
@@ -428,15 +428,13 @@ export function PaycheckView({ user }) {
 
   useEffect(() => {
     async function load() {
-      if (!user?.accessToken) return;
+      if (!user?.email) return;
       try {
         setLoading(true);
         setError(null);
         const [orderRows, ddRows] = await Promise.all([
-          fetchOrders(CONFIG.sheets.orders, user.accessToken, isRep ? user.name : null),
-          CONFIG.sheets.master
-            ? fetchDDData(CONFIG.sheets.master, user.accessToken, isRep ? user.name : null, CONFIG.officeLegalName)
-            : Promise.resolve([]),
+          fetchOrders(user.email, isRep ? user.name : null),
+          fetchDDData(user.email, isRep ? user.name : null),
         ]);
         setOrders(orderRows);
         setDDData(ddRows);
@@ -448,7 +446,7 @@ export function PaycheckView({ user }) {
       }
     }
     load();
-  }, [user?.accessToken, user?.name, isRep]);
+  }, [user?.email, user?.name, isRep]);
 
   const allReps      = [...new Set(orders.map(o => o.repName).filter(Boolean))].sort();
   const activeReps   = allReps.filter(r => isRepActive(orders, r));
@@ -534,7 +532,7 @@ export function PaycheckView({ user }) {
       {!loading && error && (
         <div className="card" style={{ borderColor: '#C4748A60' }}>
           <div style={{ color: '#C4748A', fontSize: 13, marginBottom: 6 }}>⚠️ {error}</div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Check VITE_ORDERS_SHEET_ID and VITE_MASTER_TRACKER_ID in .env</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Could not reach the Archie API. Try refreshing.</div>
         </div>
       )}
 

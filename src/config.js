@@ -31,3 +31,51 @@ export function validateConfig() {
     );
   }
 }
+
+// ── Roles ────────────────────────────────────────────────────
+// Canonical role identifiers. Must match values in the ROSTER sheet.
+
+export const ROLES = {
+  REP:      'rep',
+  A_PLAYER: 'a_player',
+  MANAGER:  'manager',
+  CAPTAIN:  'captain',
+  ADMIN:    'admin',
+};
+
+
+// ── Tab definitions ──────────────────────────────────────────
+// Shape: { id, label, icon }. Rendered by Layout.jsx.
+
+export const REP_TABS = [
+  { id: 'home',      label: 'Home',     icon: '🏠' },
+  { id: 'orders',    label: 'Orders',   icon: '📦' },
+  { id: 'paycheck',  label: 'Paycheck', icon: '💰' },
+  { id: 'myday',     label: 'My Day',   icon: '📋' },
+  { id: 'archie',    label: 'Archie',   icon: '⚡' },
+  { id: 'knowledge', label: 'Playbook', icon: '📖' },
+];
+
+export const A_PLAYER_TABS = [
+  { id: 'home',      label: 'Home',     icon: '🏠' },
+  { id: 'orders',    label: 'Orders',   icon: '📦' },
+  { id: 'paycheck',  label: 'Pay',      icon: '💰' },
+  { id: 'struggles', label: 'Team',     icon: '🎯' },
+  { id: 'myday',     label: 'My Day',   icon: '📋' },
+  { id: 'archie',    label: 'Archie',   icon: '⚡' },
+];
+
+export const MANAGER_TABS = [
+  { id: 'home',      label: 'Home',       icon: '🏠' },
+  { id: 'dashboard', label: 'Dashboard',  icon: '📊' },
+  { id: 'orders',    label: 'Orders',     icon: '📦' },
+  { id: 'paycheck',  label: 'Pay',        icon: '💰' },
+  { id: 'struggles', label: 'Struggles',  icon: '🎯' },
+  { id: 'reports',   label: 'Reports',    icon: '📈' },
+  { id: 'roster',    label: 'Roster',     icon: '👥' },
+];
+
+export const CAPTAIN_TABS = [
+  { id: 'home',    label: 'Home',    icon: '🏠' },
+  { id: 'reports', label: 'Reports', icon: '📈' },
+];

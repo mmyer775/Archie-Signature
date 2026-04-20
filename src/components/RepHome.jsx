@@ -1,6 +1,5 @@
 import { useState, useEffect }      from 'react';
 import { fetchNumbers }             from '../api/sheets';
-import { CONFIG }                   from '../config';
 import { MetricsCard, useMetrics }  from './MetricsCard';
 
 const ALL_BADGES = [
@@ -115,9 +114,9 @@ export function RepHome({ user }) {
   // Load live numbers from NUMBERS sheet
   useEffect(() => {
     async function load() {
-      if (!user?.accessToken || !CONFIG.sheets.numbers) return;
+      if (!user?.email) return;
       try {
-        const rows = await fetchNumbers(CONFIG.sheets.numbers, user.accessToken, user.name);
+        const rows = await fetchNumbers(user.email, user.name);
         setWeeklyData(buildWeek(rows));
         setStreak(computeStreak(rows));
       } catch (err) {
@@ -125,7 +124,7 @@ export function RepHome({ user }) {
       }
     }
     load();
-  }, [user?.accessToken, user?.name]);
+  }, [user?.email, user?.name]);
 
   const totH  = weeklyData.reduce((a, d) => a + d.houses,  0);
   const totT  = weeklyData.reduce((a, d) => a + d.talkTos, 0);

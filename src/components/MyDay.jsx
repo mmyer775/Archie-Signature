@@ -44,16 +44,15 @@ export function MyDay({ user }) {
   const archieRef = useRef(null);
   const fetchedRef = useRef(false);
 
-  const numbersSheetId = CONFIG.sheets.numbers;
-  const accessToken    = user?.accessToken;
+  const userEmail = user?.email;
 
   // Load today's existing numbers on mount
   useEffect(() => {
     if (fetchedRef.current) return;
-    if (!numbersSheetId || !accessToken) { setLoadingToday(false); return; }
+    if (!userEmail) { setLoadingToday(false); return; }
     fetchedRef.current = true;
 
-    fetchNumbers(numbersSheetId, accessToken, user?.name)
+    fetchNumbers(userEmail, user?.name)
       .then(rows => {
         const today = rows.find(r => r.date === todayStr());
         if (today) {
@@ -80,8 +79,8 @@ export function MyDay({ user }) {
   const rate = (nk, dk) => { const d = counts[dk]; return d ? Math.round((counts[nk] / d) * 100) : 0; };
 
   async function handleSubmit() {
-    if (!numbersSheetId || !accessToken) {
-      setSheetError('Numbers sheet not configured in .env');
+    if (!userEmail) {
+      setSheetError('Not signed in.');
       return;
     }
 
@@ -91,7 +90,7 @@ export function MyDay({ user }) {
     setJustSaved(false);
 
     try {
-      await submitNumbers(numbersSheetId, accessToken, {
+      await submitNumbers(userEmail, {
         repName:     user?.name || '',
         email:       user?.email || '',
         date:        todayStr(),
@@ -104,27 +103,23 @@ export function MyDay({ user }) {
 
       setJustSaved(true);
 
-      // Archie breakdown
-      if (CONFIG.anthropicKey) {
-        setArchieLoading(true);
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
+      // Archie breakdown — goes through /api/chat (Netlify function in prod, Vite proxy in dev)
+      setArchieLoading(true);
+      try {
+        const res = await fetch(CONFIG.chatEndpoint, {
           method:  'POST',
-          headers: {
-            'Content-Type':      'application/json',
-            'x-api-key':         CONFIG.anthropicKey,
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-calls': 'true',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model:      'claude-sonnet-4-6',
+            model:      'claude-sonnet-4-5',
             max_tokens: 400,
             messages:   [{ role: 'user', content: buildPrompt(counts, user) }],
           }),
         });
         const data = await res.json();
         setArchieMsg(data?.content?.[0]?.text || 'Numbers saved. Keep pushing.');
-      } else {
-        setArchieMsg('Numbers saved. Add your Anthropic API key to get Archie\'s breakdown.');
+      } catch (chatErr) {
+        console.warn('Archie breakdown failed:', chatErr);
+        setArchieMsg('Numbers saved. Keep pushing.');
       }
 
     } catch (e) {

@@ -5,7 +5,6 @@
 
 import { useState, useEffect } from 'react';
 import { fetchMetrics }        from '../api/sheets';
-import { CONFIG }              from '../config';
 
 function pctColor(rate, type) {
   if (type === 'act')   return rate >= 80 ? '#A0C4B8' : rate >= 60 ? '#B8A0D4' : '#C4748A';
@@ -90,13 +89,13 @@ export function useMetrics(user, teamRepNames = null) {
 
   useEffect(() => {
     async function load() {
-      if (!user?.accessToken || !CONFIG.sheets.metrics) {
+      if (!user?.email) {
         setLoading(false);
         return;
       }
       try {
         setLoading(true);
-        const data = await fetchMetrics(CONFIG.sheets.metrics, user.accessToken);
+        const data = await fetchMetrics(user.email);
         setOffice(data.office);
         setReps(data.reps);
       } catch (err) {
@@ -107,7 +106,7 @@ export function useMetrics(user, teamRepNames = null) {
       }
     }
     load();
-  }, [user?.accessToken]);
+  }, [user?.email]);
 
   // Rep's own row
   const myMetrics = reps.find(r =>
