@@ -6,6 +6,21 @@ function greeting() {
   return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
 }
 
+// Tier coloring for weekly order counts
+// 0–3: baseline blue, no glow
+// 4:   cyan neon
+// 5–7: green neon
+// 8:   yellow neon
+// 9+:  hot pink neon
+function orderTierStyle(orders) {
+  const n = Number(orders) || 0;
+  if (n >= 9)  return { color: '#FF00E5', textShadow: '0 0 8px #FF00E5, 0 0 2px #FF00E5' };
+  if (n === 8) return { color: '#FFEA00', textShadow: '0 0 8px #FFEA00, 0 0 2px #FFEA00' };
+  if (n >= 5)  return { color: '#39FF14', textShadow: '0 0 8px #39FF14, 0 0 2px #39FF14' };
+  if (n === 4) return { color: '#00F0FF', textShadow: '0 0 8px #00F0FF, 0 0 2px #00F0FF' };
+  return { color: '#7B8FCE', textShadow: 'none' };
+}
+
 function WeeklyLeaderboard({ team }) {
   const sorted  = [...team].sort((a, b) => (b.weekLines || 0) - (a.weekLines || 0));
   const topLines = sorted[0]?.weekLines || 1;
@@ -17,8 +32,9 @@ function WeeklyLeaderboard({ team }) {
         <div style={{ fontSize: 10, fontFamily: 'var(--font-display)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Mon – Today</div>
       </div>
       {sorted.map((rep, i) => {
-        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : null;
-        const pct   = topLines > 0 ? Math.round(((rep.weekLines || 0) / topLines) * 100) : 0;
+        const medal   = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : null;
+        const pct     = topLines > 0 ? Math.round(((rep.weekLines || 0) / topLines) * 100) : 0;
+        const orderSx = orderTierStyle(rep.weekOrders);
         return (
           <div key={rep.id || i} style={{ marginBottom: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
@@ -32,7 +48,7 @@ function WeeklyLeaderboard({ team }) {
                   <div style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>lines</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 15, color: '#7B8FCE', lineHeight: 1 }}>{rep.weekOrders || 0}</div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 15, lineHeight: 1, ...orderSx }}>{rep.weekOrders || 0}</div>
                   <div style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>orders</div>
                 </div>
               </div>
@@ -61,6 +77,9 @@ export function APlayerHome({ user }) {
   const totalHouses  = team.reduce((a, r) => a + (r.houses || 0), 0);
   const subRate      = team.length > 0 ? Math.round((submitted.length / team.length) * 100) : 0;
   const sorted       = [...team].sort((a, b) => (b.sales || 0) - (a.sales || 0));
+
+  // ── Weekly total (team-wide lines) ──────────────────────────
+  const weekLinesTotal = team.reduce((a, r) => a + (r.weekLines || 0), 0);
 
   return (
     <div className="fade-up">
@@ -93,6 +112,19 @@ export function APlayerHome({ user }) {
           </div>
         ))}
       </div>
+
+      {/* Weekly total (team-wide lines) */}
+      {team.length > 0 && (
+        <>
+          <div style={{ fontSize: 10, fontFamily: 'var(--font-display)', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 6 }}>This Week</div>
+          <div style={{ marginBottom: 16 }}>
+            <div className="card" style={{ textAlign: 'center', padding: '14px 8px', margin: 0, borderColor: '#A0C4B840' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 28, color: '#A0C4B8', lineHeight: 1 }}>{weekLinesTotal}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, marginTop: 4 }}>Lines This Week</div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Weekly leaderboard */}
       {team.length > 0 && <WeeklyLeaderboard team={team} />}
