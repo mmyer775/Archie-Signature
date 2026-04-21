@@ -156,20 +156,20 @@ export function useAuth() {
             teamNames.unshift(rosterEntry.name);
           }
         } else if (['manager', 'captain', 'admin'].includes(role)) {
-          try {
-            const allReps = await fetchRoster(email);
-            teamNames = allReps
-              .filter(r =>
-                (r.office || '').toLowerCase() === (rosterEntry.office || '').toLowerCase() &&
-                r.status === 'active' &&
-                r.role   === 'rep'
-              )
-              .map(r => r.name)
-              .filter(Boolean);
-          } catch (e) {
-            console.warn('Could not load roster for manager:', e.message);
-          }
-        }
+  try {
+    const allReps = await fetchRoster(email);
+    teamNames = allReps
+      .filter(r =>
+        (r.office || '').toLowerCase() === (rosterEntry.office || '').toLowerCase() &&
+        r.status === 'active' &&
+        ['rep', 'a_player'].includes(r.role)
+      )
+      .map(r => r.name)
+      .filter(Boolean);
+  } catch (e) {
+    console.warn('Could not load roster for manager:', e.message);
+  }
+}
 
         // ── Step 4: Build team stats ────────────────────────────────
         let team = [];
