@@ -9,7 +9,9 @@
 //
 // Rep:      own pay + history
 // A-Player: their team + office total
-// Manager:  all reps + office total
+// Manager:  Current DD (office gross, expandable rep breakdown)
+//           Previous 4 weeks (compact rows)
+//           Projected next week (active order count + $230/line)
 // ============================================================
 
 import { useState, useEffect } from 'react';
@@ -45,7 +47,6 @@ function lastSunday() {
   sun.setHours(23, 59, 59, 999);
   return sun;
 }
-
 
 function thisWeekStart() {
   const now = new Date();
@@ -131,16 +132,34 @@ function repShareForWeek(rows) {
   return rows.reduce((s, r) => s + r.amount, 0) / 2;
 }
 
-// Office gross = raw sum, no split
+// Office gross = raw sum, no split (includes captain bonus rows with blank rep names)
 function officeGrossForWeek(rows) {
   return rows.reduce((s, r) => s + r.amount, 0);
 }
 
 // Get the most recent DD week's rows for a rep
-// Only return if it matches the most recent week in the full dataset
 function currentWeekRepRows(repDdRows, mostRecentWeek) {
   if (!mostRecentWeek) return [];
   return repDdRows.filter(r => r.ddWeek === mostRecentWeek);
+}
+
+// Group a week's rows by rep name, excluding blank-name rows (captain bonuses)
+// Returns array of { repName, grossAmount, repTakeHome } sorted by take-home desc
+function repBreakdownForWeek(rows) {
+  const byRep = {};
+  rows.forEach(r => {
+    const name = (r.repName || '').trim();
+    if (!name) return; // skip captain bonus rows
+    if (!byRep[name]) byRep[name] = 0;
+    byRep[name] += Number(r.amount) || 0;
+  });
+  return Object.entries(byRep)
+    .map(([repName, grossAmount]) => ({
+      repName,
+      grossAmount,
+      repTakeHome: grossAmount / 2,
+    }))
+    .sort((a, b) => b.repTakeHome - a.repTakeHome);
 }
 
 function PayBadge({ label, color }) {
@@ -183,140 +202,7 @@ function TargetSelector({ target, onChange }) {
   );
 }
 
-function ProjectedCard({ lines, pay, target }) {
-  const pct   = Math.min(Math.round((lines / target) * 100), 100);
-  const color = pct >= 100 ? '#A0C4B8' : pct >= 60 ? '#B8A0D4' : '#C4748A';
-  return (
-    <div className="card" style={{ marginBottom: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-        <div>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 32, color: '#A0C4B8', lineHeight: 1 }}>
-            {fmtShort(pay)}
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
-            {lines} line{lines !== 1 ? 's' : ''} activated {dateFmt(lastMonday())}–{dateFmt(lastSunday())}
-          </div>
-        </div>
-        <PayBadge label="Projected" color="#B8A0D4" />
-      </div>
-      <div style={{ height: 6, background: 'var(--bg-raised)', borderRadius: 100, overflow: 'hidden', margin: '16px 0 8px' }}>
-        <div style={{ height: '100%', width: `${pct}%`, background: `linear-gradient(90deg,${color}99,${color})`, borderRadius: 100, transition: 'width 0.5s ease' }} />
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)' }}>
-        <span>{lines} / {target} line target</span>
-        <span style={{ color }}>{pct}%</span>
-      </div>
-      <div style={{ marginTop: 14, padding: '10px 14px', background: '#B8A0D415', border: '1px solid #B8A0D430', borderRadius: 'var(--radius-sm)', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-        💡 ${RATE_PER_LINE}/line · finalizes Wed at 2pm · *does not include bonuses
-      </div>
-    </div>
-  );
-}
-
-function RealPayCard({ amount, ddWeek }) {
-  return (
-    <div className="card" style={{ marginBottom: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-        <div>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 32, color: '#A0C4B8', lineHeight: 1 }}>
-            {fmtMoney(amount)}
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>DD Week: {ddWeek || '—'}</div>
-        </div>
-        <PayBadge label="Real Paycheck" color="#A0C4B8" />
-      </div>
-      <div style={{ marginTop: 14, padding: '10px 14px', background: '#A0C4B815', border: '1px solid #A0C4B830', borderRadius: 'var(--radius-sm)', fontSize: 12, color: 'var(--text-muted)' }}>
-        * subject to tax repayment and other Helen related debts
-      </div>
-    </div>
-  );
-}
-
-function PayHistory({ weeklyHistory }) {
-  if (!weeklyHistory.length) return (
-    <div className="card" style={{ textAlign: 'center', padding: '24px 16px', opacity: 0.6 }}>
-      <div style={{ fontSize: 28, marginBottom: 8 }}>📋</div>
-      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 14, color: 'var(--text)', marginBottom: 4 }}>No pay history yet</div>
-      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Previous weeks will appear once DD data is available.</div>
-    </div>
-  );
-  return (
-    <div className="card">
-      {weeklyHistory.map(([week, rows], i) => {
-        const amt   = repShareForWeek(rows);
-        const color = amt >= 1500 ? '#A0C4B8' : amt >= 800 ? '#B8A0D4' : '#C4748A';
-        return (
-          <div key={week} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: i < weeklyHistory.length - 1 ? '1px solid var(--border)' : 'none' }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 14, color: 'var(--text)' }}>{week}</div>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 18, color }}>{fmtMoney(amt)}</div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function RepPayRow({ repName, projected, realPay, showReal, target, ddHistory }) {
-  const [open, setOpen] = useState(false);
-  const amount = showReal ? realPay : projected.pay;
-  const pct    = Math.min(Math.round((projected.lines / target) * 100), 100);
-  const color  = showReal
-    ? (amount >= 1500 ? '#A0C4B8' : amount >= 800 ? '#B8A0D4' : '#C4748A')
-    : (pct >= 100 ? '#A0C4B8' : pct >= 60 ? '#B8A0D4' : '#C4748A');
-
-  return (
-    <>
-      <div
-        onClick={() => setOpen(o => !o)}
-        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: open ? 'none' : '1px solid var(--border)', cursor: 'pointer' }}
-      >
-        <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#7B5EA7,#C4748A)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 16, color: '#EDE8F5', flexShrink: 0 }}>
-          {(repName || '?')[0].toUpperCase()}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 14, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {repName}
-          </div>
-          {!showReal && (
-            <div style={{ height: 4, background: 'var(--bg-raised)', borderRadius: 100, overflow: 'hidden', marginTop: 5, width: '80%' }}>
-              <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 100 }} />
-            </div>
-          )}
-          {!showReal && (
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>{projected.lines} / {target} lines</div>
-          )}
-        </div>
-        <div style={{ textAlign: 'right', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 18, color }}>{fmtMoney(amount)}</div>
-            {!showReal && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>projected</div>}
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', opacity: 0.6 }}>{open ? '▲' : '▼'}</div>
-        </div>
-      </div>
-
-      {open && (
-        <div style={{ padding: '8px 0 12px 48px', borderBottom: '1px solid var(--border)' }}>
-          {ddHistory.length === 0 ? (
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No DD pay history found.</div>
-          ) : (
-            ddHistory.slice(0, 4).map(([week, rows]) => {
-              const amt = repShareForWeek(rows);
-              const c   = amt >= 1500 ? '#A0C4B8' : amt >= 800 ? '#B8A0D4' : '#C4748A';
-              return (
-                <div key={week} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0' }}>
-                  <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, color: 'var(--text)' }}>{week}</span>
-                  <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 14, color: c }}>{fmtMoney(amt)}</span>
-                </div>
-              );
-            })
-          )}
-        </div>
-      )}
-    </>
-  );
-}
-
+// ── Rep-side components (unchanged) ──────────────────────────
 
 function HistoryCard({ weeklyHistory }) {
   const [expanded, setExpanded] = useState(false);
@@ -404,6 +290,232 @@ function ProjectedThisWeekCard({ orders, repName, target }) {
   );
 }
 
+// ── Manager-side components ──────────────────────────────────
+
+// Current DD card: office gross at top, collapsible rep-by-rep take-home breakdown
+function CurrentDDCard({ rows, ddWeek }) {
+  const [open, setOpen]  = useState(false);
+  const officeGross      = officeGrossForWeek(rows);
+  const breakdown        = repBreakdownForWeek(rows);
+
+  return (
+    <div className="card" style={{ marginBottom: 12, borderColor: '#A0C4B830' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+        <div>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 32, color: '#A0C4B8', lineHeight: 1 }}>
+            {fmtMoney(officeGross)}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
+            Gross office total · DD Week {ddWeek || '—'}
+          </div>
+        </div>
+        <PayBadge label="Current DD" color="#A0C4B8" />
+      </div>
+
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width: '100%',
+          marginTop: 14,
+          padding: '10px 14px',
+          background: '#A0C4B815',
+          border: '1px solid #A0C4B830',
+          borderRadius: 'var(--radius-sm)',
+          cursor: 'pointer',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          color: 'var(--text)',
+          fontFamily: 'var(--font-display)',
+          fontWeight: 700,
+          fontSize: 12,
+        }}
+      >
+        <span>Rep breakdown ({breakdown.length} rep{breakdown.length !== 1 ? 's' : ''})</span>
+        <span style={{ fontSize: 14, color: 'var(--text-muted)', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }}>▾</span>
+      </button>
+
+      {open && (
+        <div style={{ marginTop: 10 }}>
+          {breakdown.length === 0 ? (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '8px 0', textAlign: 'center' }}>
+              No rep rows for this week.
+            </div>
+          ) : (
+            breakdown.map((row, i) => {
+              const color = row.repTakeHome >= 1500 ? '#A0C4B8' : row.repTakeHome >= 800 ? '#B8A0D4' : '#C4748A';
+              return (
+                <div
+                  key={row.repName}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '10px 0',
+                    borderBottom: i < breakdown.length - 1 ? '1px solid var(--border)' : 'none',
+                  }}
+                >
+                  <div style={{
+                    width: 30, height: 30, borderRadius: 8,
+                    background: 'linear-gradient(135deg,#7B5EA7,#C4748A)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 13, color: '#EDE8F5', flexShrink: 0,
+                  }}>
+                    {row.repName[0].toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 13, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {row.repName}
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 15, color }}>
+                    {fmtMoney(row.repTakeHome)}
+                  </div>
+                </div>
+              );
+            })
+          )}
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, fontStyle: 'italic' }}>
+            * Rep take-home = gross ÷ 2 (50/50 split). Captain bonuses excluded.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Previous 4 weeks, compact rows (office gross)
+function PreviousWeeksCard({ weekGroups }) {
+  if (weekGroups.length === 0) return null;
+  return (
+    <div className="card" style={{ marginBottom: 12 }}>
+      {weekGroups.map(([week, rows], i) => {
+        const amt   = officeGrossForWeek(rows);
+        const color = amt >= 40000 ? '#A0C4B8' : amt >= 20000 ? '#B8A0D4' : '#C4748A';
+        return (
+          <div
+            key={week}
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '12px 0',
+              borderBottom: i < weekGroups.length - 1 ? '1px solid var(--border)' : 'none',
+            }}
+          >
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 14, color: 'var(--text)' }}>{week}</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 18, color }}>{fmtMoney(amt)}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Projected next week card: total office projection + active order count
+function ProjectedNextWeekCard({ totalLines, activeRepCount }) {
+  const pay = totalLines * MANAGER_RATE;
+  return (
+    <div className="card" style={{ marginBottom: 12, borderColor: '#B8A0D430' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+        <div>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 32, color: '#B8A0D4', lineHeight: 1 }}>
+            {fmtShort(pay)}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
+            {dateFmt(lastMonday())}–{dateFmt(lastSunday())} · {activeRepCount} active rep{activeRepCount !== 1 ? 's' : ''}
+          </div>
+        </div>
+        <PayBadge label="Projected" color="#B8A0D4" />
+      </div>
+      <div style={{
+        marginTop: 14,
+        padding: '10px 14px',
+        background: '#B8A0D415',
+        border: '1px solid #B8A0D430',
+        borderRadius: 'var(--radius-sm)',
+        fontSize: 12,
+        color: 'var(--text-muted)',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+      }}>
+        <span>
+          <strong style={{ color: 'var(--text)', fontFamily: 'var(--font-display)', fontWeight: 800 }}>{totalLines}</strong> active line{totalLines !== 1 ? 's' : ''} × ${MANAGER_RATE}
+        </span>
+        <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, color: '#B8A0D4' }}>
+          = {fmtShort(pay)}
+        </span>
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, fontStyle: 'italic' }}>
+        * Finalizes Wed at 2pm. Does not include bonuses.
+      </div>
+    </div>
+  );
+}
+
+// Rep row for A-Player office view (kept from original)
+function RepPayRow({ repName, projected, realPay, showReal, target, ddHistory }) {
+  const [open, setOpen] = useState(false);
+  const amount = showReal ? realPay : projected.pay;
+  const pct    = Math.min(Math.round((projected.lines / target) * 100), 100);
+  const color  = showReal
+    ? (amount >= 1500 ? '#A0C4B8' : amount >= 800 ? '#B8A0D4' : '#C4748A')
+    : (pct >= 100 ? '#A0C4B8' : pct >= 60 ? '#B8A0D4' : '#C4748A');
+
+  return (
+    <>
+      <div
+        onClick={() => setOpen(o => !o)}
+        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: open ? 'none' : '1px solid var(--border)', cursor: 'pointer' }}
+      >
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#7B5EA7,#C4748A)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 16, color: '#EDE8F5', flexShrink: 0 }}>
+          {(repName || '?')[0].toUpperCase()}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 14, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {repName}
+          </div>
+          {!showReal && (
+            <div style={{ height: 4, background: 'var(--bg-raised)', borderRadius: 100, overflow: 'hidden', marginTop: 5, width: '80%' }}>
+              <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 100 }} />
+            </div>
+          )}
+          {!showReal && (
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>{projected.lines} / {target} lines</div>
+          )}
+        </div>
+        <div style={{ textAlign: 'right', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 18, color }}>{fmtMoney(amount)}</div>
+            {!showReal && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>projected</div>}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', opacity: 0.6 }}>{open ? '▲' : '▼'}</div>
+        </div>
+      </div>
+
+      {open && (
+        <div style={{ padding: '8px 0 12px 48px', borderBottom: '1px solid var(--border)' }}>
+          {ddHistory.length === 0 ? (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No DD pay history found.</div>
+          ) : (
+            ddHistory.slice(0, 4).map(([week, rows]) => {
+              const amt = repShareForWeek(rows);
+              const c   = amt >= 1500 ? '#A0C4B8' : amt >= 800 ? '#B8A0D4' : '#C4748A';
+              return (
+                <div key={week} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0' }}>
+                  <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, color: 'var(--text)' }}>{week}</span>
+                  <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 14, color: c }}>{fmtMoney(amt)}</span>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+// ── Main ─────────────────────────────────────────────────────
+
 export function PaycheckView({ user }) {
   const [orders,       setOrders]       = useState([]);
   const [ddData,       setDDData]       = useState([]);
@@ -458,6 +570,8 @@ export function PaycheckView({ user }) {
   // All week groups for office-level view (gross, no split)
   const allWeekGroups  = groupByWeek(ddData);
   const mostRecentWeek = allWeekGroups[0]?.[0] || null;
+  const currentWeekRows = allWeekGroups[0]?.[1] || [];
+  const previousFourWeeks = allWeekGroups.slice(1, 5); // weeks 2–5 = previous 4
 
   // Per-rep DD history (rep share = /2)
   const repDdHistory = {};
@@ -476,20 +590,14 @@ export function PaycheckView({ user }) {
     repRealPay[rep] = currentRows.length > 0 ? repShareForWeek(currentRows) : 0;
   });
 
-  // Office totals
+  // Office totals for projection
   const totalLines     = Object.values(repProjected).reduce((s, r) => s + r.lines, 0);
-  const totalProjected = totalLines * MANAGER_RATE;
-  // Office real = gross total for most recent week (no split)
-  const totalReal      = mostRecentWeek
-    ? officeGrossForWeek(allWeekGroups[0]?.[1] || [])
-    : 0;
 
   // My (rep) data
-  const myProjected  = computeProjected(orders, user?.name);
-  const myDd         = ddData.filter(r => r.repName.toLowerCase() === (user?.name || '').toLowerCase());
-  const myWeeks      = groupByWeek(myDd);
+  const myProjected   = computeProjected(orders, user?.name);
+  const myDd          = ddData.filter(r => r.repName.toLowerCase() === (user?.name || '').toLowerCase());
+  const myWeeks       = groupByWeek(myDd);
   const myCurrentRows = currentWeekRepRows(myDd, mostRecentWeek);
-  const myRealAmount  = myCurrentRows.length > 0 ? repShareForWeek(myCurrentRows) : 0;
   const myDDWeek      = mostRecentWeek;
   const myHistory     = myWeeks.slice(0, 4);
 
@@ -511,14 +619,18 @@ export function PaycheckView({ user }) {
         <div>
           <div className="section-title">{isManager ? 'Pay Overview' : isAPlayer ? 'Office View' : 'My Pay'}</div>
           <div className="section-subtitle">
-            {showReal
-              ? `Real paycheck · DD Week ${mostRecentWeek || '—'}`
-              : `Projected · ${dateFmt(lastMonday())}–${dateFmt(lastSunday())}`}
+            {isManager
+              ? `DD Week ${mostRecentWeek || '—'}`
+              : showReal
+                ? `Real paycheck · DD Week ${mostRecentWeek || '—'}`
+                : `Projected · ${dateFmt(lastMonday())}–${dateFmt(lastSunday())}`}
           </div>
         </div>
-        <div style={{ fontSize: 11, fontFamily: 'var(--font-display)', fontWeight: 700, padding: '4px 10px', background: showReal ? '#A0C4B815' : '#B8A0D415', border: `1px solid ${showReal ? '#A0C4B840' : '#B8A0D440'}`, borderRadius: 100, color: showReal ? '#A0C4B8' : '#B8A0D4' }}>
-          {showReal ? '✓ Final' : '~ Est.'}
-        </div>
+        {!isManager && (
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-display)', fontWeight: 700, padding: '4px 10px', background: showReal ? '#A0C4B815' : '#B8A0D415', border: `1px solid ${showReal ? '#A0C4B840' : '#B8A0D440'}`, borderRadius: 100, color: showReal ? '#A0C4B8' : '#B8A0D4' }}>
+            {showReal ? '✓ Final' : '~ Est.'}
+          </div>
+        )}
       </div>
 
       {loading && (
@@ -538,10 +650,11 @@ export function PaycheckView({ user }) {
 
       {!loading && !error && (
         <>
-          <TargetSelector target={target} onChange={handleTargetChange} />
-
+          {/* ── Rep view ──────────────────────────────────── */}
           {isRep && (
             <>
+              <TargetSelector target={target} onChange={handleTargetChange} />
+
               {/* Card 1 — Current Paycheck */}
               <SectionLabel>Current Paycheck</SectionLabel>
               {myCurrentRows.length > 0 ? (
@@ -568,7 +681,7 @@ export function PaycheckView({ user }) {
                 </div>
               )}
 
-              {/* Card 2 — History (4 weeks, collapsible) */}
+              {/* Card 2 — History */}
               <SectionLabel>History</SectionLabel>
               {myHistory.length > 0 ? (
                 <HistoryCard weeklyHistory={myHistory} />
@@ -578,19 +691,51 @@ export function PaycheckView({ user }) {
                 </div>
               )}
 
-              {/* Card 3 — Projected this Mon–Sun, always visible */}
+              {/* Card 3 — Projected this week */}
               <SectionLabel>This Week · Projected</SectionLabel>
               <ProjectedThisWeekCard orders={orders} repName={user?.name} target={target} />
             </>
           )}
 
-          {(isManager || isAPlayer) && (
+          {/* ── Manager view ─────────────────────────────── */}
+          {isManager && (
             <>
+              {/* Current DD — always at top */}
+              <SectionLabel>Current DD</SectionLabel>
+              {currentWeekRows.length > 0 ? (
+                <CurrentDDCard rows={currentWeekRows} ddWeek={mostRecentWeek} />
+              ) : (
+                <div className="card" style={{ marginBottom: 12, opacity: 0.6, textAlign: 'center', padding: '24px 16px' }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No DD data yet for the current week.</div>
+                </div>
+              )}
+
+              {/* Previous 4 weeks */}
+              <SectionLabel>Previous 4 Weeks</SectionLabel>
+              {previousFourWeeks.length > 0 ? (
+                <PreviousWeeksCard weekGroups={previousFourWeeks} />
+              ) : (
+                <div className="card" style={{ marginBottom: 12, opacity: 0.6, textAlign: 'center', padding: '16px' }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No prior DD weeks available yet.</div>
+                </div>
+              )}
+
+              {/* Projected next week */}
+              <SectionLabel>Projected · Next Week</SectionLabel>
+              <ProjectedNextWeekCard totalLines={totalLines} activeRepCount={activeReps.length} />
+            </>
+          )}
+
+          {/* ── A-Player view (kept from original) ───────── */}
+          {isAPlayer && (
+            <>
+              <TargetSelector target={target} onChange={handleTargetChange} />
+
               <div className="card" style={{ marginBottom: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
                   <div>
                     <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 30, color: '#A0C4B8', lineHeight: 1 }}>
-                      {fmtMoney(showReal ? totalReal : totalProjected)}
+                      {fmtMoney(showReal ? officeGrossForWeek(currentWeekRows) : totalLines * MANAGER_RATE)}
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
                       {showReal
@@ -612,11 +757,9 @@ export function PaycheckView({ user }) {
                 )}
               </div>
 
-              {isAPlayer && (
-                <div style={{ marginTop: 10, padding: '8px 12px', background: '#B8A0D415', border: '1px solid #B8A0D430', borderRadius: 'var(--radius-sm)', fontSize: 11, color: '#B8A0D4', fontFamily: 'var(--font-display)', fontWeight: 700 }}>
-                  👁 Manager view — ${MANAGER_RATE}/line office revenue · your rep commission is ${RATE_PER_LINE}/line
-                </div>
-              )}
+              <div style={{ marginTop: 10, padding: '8px 12px', background: '#B8A0D415', border: '1px solid #B8A0D430', borderRadius: 'var(--radius-sm)', fontSize: 11, color: '#B8A0D4', fontFamily: 'var(--font-display)', fontWeight: 700 }}>
+                👁 A-Player view — ${MANAGER_RATE}/line office revenue · your rep commission is ${RATE_PER_LINE}/line
+              </div>
 
               {activeReps.length > 0 && (
                 <div className="card" style={{ marginBottom: 12 }}>
