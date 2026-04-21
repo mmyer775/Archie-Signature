@@ -60,7 +60,6 @@ function WeeklyLeaderboard({ team }) {
 export function ManagerHome({ user }) {
   const firstName = (user?.name || 'Manager').split(' ')[0];
   const team      = Array.isArray(user?.team) && user.team.length > 0 ? user.team : [];
-  console.log('team:', team);
   const [tab, setTab] = useState('team');
 
   const { office: officeMetrics, loading: metricsLoading } = useMetrics(user);
@@ -72,6 +71,10 @@ export function ManagerHome({ user }) {
   const totalSaras   = team.reduce((a, r) => a + (r.saras  || 0), 0);
   const subRate      = team.length > 0 ? Math.round((submitted.length / team.length) * 100) : 0;
   const sorted       = [...team].sort((a, b) => (b.sales || 0) - (a.sales || 0));
+
+  // ── Weekly totals (office-wide) ─────────────────────────────
+  const weekLinesTotal  = team.reduce((a, r) => a + (r.weekLines  || 0), 0);
+  const weekOrdersTotal = team.reduce((a, r) => a + (r.weekOrders || 0), 0);
 
   return (
     <div className="fade-up">
@@ -104,6 +107,23 @@ export function ManagerHome({ user }) {
           </div>
         ))}
       </div>
+
+      {/* Weekly totals (office-wide) */}
+      {team.length > 0 && (
+        <>
+          <div style={{ fontSize: 10, fontFamily: 'var(--font-display)', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 6 }}>This Week</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+            <div className="card" style={{ textAlign: 'center', padding: '12px 8px', margin: 0, borderColor: '#A0C4B840' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 22, color: '#A0C4B8', lineHeight: 1 }}>{weekLinesTotal}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, marginTop: 4 }}>Lines</div>
+            </div>
+            <div className="card" style={{ textAlign: 'center', padding: '12px 8px', margin: 0, borderColor: '#7B8FCE40' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 22, color: '#7B8FCE', lineHeight: 1 }}>{weekOrdersTotal}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, marginTop: 4 }}>Orders</div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Weekly leaderboard */}
       {team.length > 0 && <WeeklyLeaderboard team={team} />}
