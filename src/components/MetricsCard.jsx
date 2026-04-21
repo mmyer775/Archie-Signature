@@ -108,7 +108,7 @@ export function MetricsCard({ metrics, label }) {
       </div>
       <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
         <div style={{ flex: 1, fontSize: 10, color: 'var(--text-muted)' }}>activation</div>
-        <div style={{ flex: 1, fontSize: 10, color: 'var(--text-muted)' }}>churn <span style={{ opacity: 0.6 }}>(scale: 10%)</span></div>
+        <div style={{ flex: 1, fontSize: 10, color: 'var(--text-muted)' }}>churn</div>
       </div>
     </div>
   );
