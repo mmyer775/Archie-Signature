@@ -410,9 +410,21 @@ function PreviousWeeksCard({ weekGroups }) {
   );
 }
 
-// Projected next week card: total office projection + active order count
-function ProjectedNextWeekCard({ totalLines, activeRepCount }) {
+// Projected next week card: total office projection + collapsible rep breakdown
+function ProjectedNextWeekCard({ totalLines, activeRepCount, repProjected }) {
+  const [open, setOpen] = useState(false);
   const pay = totalLines * MANAGER_RATE;
+
+  // Rep breakdown: projected take-home = lines × $110 per rep, sorted high→low
+  const breakdown = Object.entries(repProjected)
+    .map(([repName, { lines }]) => ({
+      repName,
+      lines,
+      repTakeHome: lines * RATE_PER_LINE,
+    }))
+    .filter(r => r.lines > 0)
+    .sort((a, b) => b.repTakeHome - a.repTakeHome);
+
   return (
     <div className="card" style={{ marginBottom: 12, borderColor: '#B8A0D430' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
@@ -445,8 +457,81 @@ function ProjectedNextWeekCard({ totalLines, activeRepCount }) {
           = {fmtShort(pay)}
         </span>
       </div>
+
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width: '100%',
+          marginTop: 10,
+          padding: '10px 14px',
+          background: '#B8A0D415',
+          border: '1px solid #B8A0D430',
+          borderRadius: 'var(--radius-sm)',
+          cursor: 'pointer',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          color: 'var(--text)',
+          fontFamily: 'var(--font-display)',
+          fontWeight: 700,
+          fontSize: 12,
+        }}
+      >
+        <span>Rep breakdown ({breakdown.length} rep{breakdown.length !== 1 ? 's' : ''})</span>
+        <span style={{ fontSize: 14, color: 'var(--text-muted)', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }}>▾</span>
+      </button>
+
+      {open && (
+        <div style={{ marginTop: 10 }}>
+          {breakdown.length === 0 ? (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '8px 0', textAlign: 'center' }}>
+              No active lines projected yet this cycle.
+            </div>
+          ) : (
+            breakdown.map((row, i) => {
+              const color = row.repTakeHome >= 1500 ? '#A0C4B8' : row.repTakeHome >= 800 ? '#B8A0D4' : '#C4748A';
+              return (
+                <div
+                  key={row.repName}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '10px 0',
+                    borderBottom: i < breakdown.length - 1 ? '1px solid var(--border)' : 'none',
+                  }}
+                >
+                  <div style={{
+                    width: 30, height: 30, borderRadius: 8,
+                    background: 'linear-gradient(135deg,#7B5EA7,#C4748A)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 13, color: '#EDE8F5', flexShrink: 0,
+                  }}>
+                    {row.repName[0].toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 13, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {row.repName}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+                      {row.lines} line{row.lines !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 15, color }}>
+                    {fmtMoney(row.repTakeHome)}
+                  </div>
+                </div>
+              );
+            })
+          )}
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, fontStyle: 'italic' }}>
+            * Rep take-home = lines × ${RATE_PER_LINE}. Does not include bonuses.
+          </div>
+        </div>
+      )}
+
       <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, fontStyle: 'italic' }}>
-        * Finalizes Wed at 2pm. Does not include bonuses.
+        * Finalizes Wed at 2pm.
       </div>
     </div>
   );
@@ -722,7 +807,7 @@ export function PaycheckView({ user }) {
 
               {/* Projected next week */}
               <SectionLabel>Projected · Next Week</SectionLabel>
-              <ProjectedNextWeekCard totalLines={totalLines} activeRepCount={activeReps.length} />
+              <ProjectedNextWeekCard totalLines={totalLines} activeRepCount={activeReps.length} repProjected={repProjected} />
             </>
           )}
 
