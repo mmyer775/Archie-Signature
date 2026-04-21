@@ -60,6 +60,7 @@ function WeeklyLeaderboard({ team }) {
 export function ManagerHome({ user }) {
   const firstName = (user?.name || 'Manager').split(' ')[0];
   const team      = Array.isArray(user?.team) && user.team.length > 0 ? user.team : [];
+  console.log('team:', team);
   const [tab, setTab] = useState('team');
 
   const { office: officeMetrics, loading: metricsLoading } = useMetrics(user);
