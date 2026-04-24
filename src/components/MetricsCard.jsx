@@ -362,7 +362,7 @@ export function MetricsCard({ metrics, label, reps = [], showRepBreakdown = fals
           <div style={{ height: '100%', width: `${Math.min(metrics.actRate, 100)}%`, background: actColor, borderRadius: 100, transition: 'width 0.5s ease' }} />
         </div>
         <div style={{ flex: 1, height: 4, background: 'var(--bg-overlay)', borderRadius: 100, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${Math.min(metrics.churnRate, 100)}%`, background: churnColor, borderRadius: 100, transition: 'width 0.5s ease' }} />
+  <div style={{ height: '100%', width: `${Math.min((metrics.churnRate / 10) * 100, 100)}%`, background: churnColor, borderRadius: 100, transition: 'width 0.5s ease' }} />
         </div>
       </div>
 
