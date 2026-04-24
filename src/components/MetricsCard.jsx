@@ -20,6 +20,75 @@ function fmtPct(rate) {
   return `${n.toFixed(1)}%`;
 }
 
+// ── useMetrics hook ──────────────────────────────────────────────────────
+// Loads { office, reps, myMetrics, teamMetrics, loading, error } for the signed-in user.
+// myMetrics: the rep's own row (for RepHome)
+// teamMetrics: summed stats across user's team (for APlayerHome)
+export function useMetrics(user) {
+  const [office, setOffice]   = useState(null);
+  const [reps, setReps]       = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      if (!user?.email) {
+        setLoading(false);
+        return;
+      }
+      try {
+        setLoading(true);
+        const { office: off, reps: r } = await fetchMetrics(user.email);
+        if (cancelled) return;
+        setOffice(off || null);
+        setReps(Array.isArray(r) ? r : []);
+      } catch (e) {
+        if (!cancelled) setError(e.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [user?.email]);
+
+  // ── Rep's own row (for RepHome) ─────────────────────────────────────────
+  const myMetrics = reps.find(
+    r => (r.repName || '').toLowerCase().trim() === (user?.name || '').toLowerCase().trim()
+  ) || null;
+
+  // ── Team aggregate (for APlayerHome) ────────────────────────────────────
+  const teamNames = Array.isArray(user?.team)
+    ? user.team.map(t => (typeof t === 'string' ? t : t.name)).filter(Boolean)
+    : [];
+
+  let teamMetrics = null;
+  if (teamNames.length > 0) {
+    const teamSet = new Set(teamNames.map(n => n.toLowerCase().trim()));
+    const teamRows = reps.filter(r => teamSet.has((r.repName || '').toLowerCase().trim()));
+
+    if (teamRows.length > 0) {
+      const actCount    = teamRows.reduce((s, r) => s + (r.actCount    || 0), 0);
+      const lineTotal   = teamRows.reduce((s, r) => s + (r.lineTotal   || 0), 0);
+      const churnCount  = teamRows.reduce((s, r) => s + (r.churnCount  || 0), 0);
+      const activeLines = teamRows.reduce((s, r) => s + (r.activeLines || 0), 0);
+
+      teamMetrics = {
+        actCount,
+        lineTotal,
+        actRate:     lineTotal   > 0 ? Math.round((actCount   / lineTotal)   * 1000) / 10 : 0,
+        churnCount,
+        activeLines,
+        churnRate:   activeLines > 0 ? Math.round((churnCount / activeLines) * 1000) / 10 : 0,
+      };
+    }
+  }
+
+  return { office, reps, myMetrics, teamMetrics, loading, error };
+}
+
+// ── StatBox ──────────────────────────────────────────────────────────────
 function StatBox({ label, value, sub, color }) {
   return (
     <div style={{ flex: 1, textAlign: 'center', padding: '12px 8px', background: 'var(--bg-raised)', borderRadius: 10, border: `1px solid ${color}30` }}>
@@ -86,7 +155,6 @@ function RepRow({ rep, highlight = false }) {
       borderBottom: '1px solid var(--border)',
       padding: '0',
     }}>
-      {/* Collapsed header — always visible */}
       <button
         onClick={() => setExpanded(prev => !prev)}
         style={{
@@ -108,7 +176,7 @@ function RepRow({ rep, highlight = false }) {
             fontFamily: 'var(--font-display)',
             fontWeight: highlight ? 800 : 600,
             fontSize: 13,
-            color: highlight ? 'var(--primary)' : 'var(--text)',
+            color: highlight ? '#B8A0D4' : 'var(--text)',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
@@ -118,7 +186,6 @@ function RepRow({ rep, highlight = false }) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {/* Quick peek: act rate and churn rate */}
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <div style={{ textAlign: 'right' }}>
               <div style={{
@@ -146,7 +213,6 @@ function RepRow({ rep, highlight = false }) {
             </div>
           </div>
 
-          {/* Chevron */}
           <div style={{
             color: 'var(--text-muted)',
             fontSize: 12,
@@ -160,7 +226,6 @@ function RepRow({ rep, highlight = false }) {
         </div>
       </button>
 
-      {/* Expanded details */}
       {expanded && (
         <div style={{
           paddingBottom: 14,
@@ -221,7 +286,6 @@ export function MetricsCard({ metrics, label, reps = [], showRepBreakdown = fals
         </div>
       )}
 
-      {/* Top-level 3 stat boxes */}
       <div style={{ display: 'flex', gap: 8 }}>
         <StatBox
           label="Act Rate"
@@ -243,7 +307,6 @@ export function MetricsCard({ metrics, label, reps = [], showRepBreakdown = fals
         />
       </div>
 
-      {/* Mini progress bars */}
       <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
         <div style={{ flex: 1, height: 4, background: 'var(--bg-overlay)', borderRadius: 100, overflow: 'hidden' }}>
           <div style={{ height: '100%', width: `${Math.min(metrics.actRate, 100)}%`, background: actColor, borderRadius: 100, transition: 'width 0.5s ease' }} />
@@ -253,7 +316,6 @@ export function MetricsCard({ metrics, label, reps = [], showRepBreakdown = fals
         </div>
       </div>
 
-      {/* Per-rep collapsible breakdown */}
       {showRepBreakdown && reps.length > 0 && (
         <div style={{ marginTop: 16 }}>
           <div style={{
