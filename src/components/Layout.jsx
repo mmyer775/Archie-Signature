@@ -5,7 +5,7 @@ function roleLabel(role) {
   return map[role] || role;
 }
 
-export function Layout({ user, activeTab, tabs, onTabChange, onSignOut, children }) {
+export function Layout({ user, activeTab, tabs, onTabChange, onSignOut, adminSwitcher, children }) {
   const parts = (user?.name || '').split(' ');
   const displayName = parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0];
 
@@ -14,6 +14,10 @@ export function Layout({ user, activeTab, tabs, onTabChange, onSignOut, children
       <header className="app-header">
         <div className="app-header-brand">arch<span>ie</span></div>
         <div className="app-header-office">{import.meta.env.VITE_OFFICE_NAME || 'Office'}</div>
+
+        {/* Admin switcher — only renders for admins; returns null otherwise */}
+        {adminSwitcher}
+
         <button className="app-header-user" onClick={onSignOut} title="Sign out">
           <span className="app-header-door">🚪</span>
           <span className="app-header-user-name">{displayName}</span>

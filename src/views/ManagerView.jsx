@@ -147,11 +147,18 @@ function OfficeDashboard({ user }) {
 
 // ── Main ──────────────────────────────────────────────────────
 
-export function ManagerView({ user, onSignOut }) {
+export function ManagerView({ user, onSignOut, adminSwitcher }) {
   const [tab, setTab] = useState('home');
 
   return (
-    <Layout user={user} activeTab={tab} tabs={MANAGER_TABS} onTabChange={setTab} onSignOut={onSignOut}>
+    <Layout
+      user={user}
+      activeTab={tab}
+      tabs={MANAGER_TABS}
+      onTabChange={setTab}
+      onSignOut={onSignOut}
+      adminSwitcher={adminSwitcher}
+    >
       {tab === 'home'      && <ManagerHome user={user} />}
       {tab === 'dashboard' && <OfficeDashboard user={user} />}
       {tab === 'orders'    && <OrdersView user={user} />}
