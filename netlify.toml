@@ -5,7 +5,7 @@
 
 [build.environment]
   NODE_VERSION = "18"
-  SECRETS_SCAN_OMIT_KEYS = "VITE_OFFICE_NAME"
+  SECRETS_SCAN_OMIT_KEYS = "VITE_OFFICE_NAME,VITE_OFFICE_LEGAL_NAME"
 
 # Route /api/chat to the Netlify function
 # MUST come before the SPA catchall below — order matters
