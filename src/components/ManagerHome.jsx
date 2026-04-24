@@ -78,7 +78,8 @@ export function ManagerHome({ user }) {
   const team      = Array.isArray(user?.team) && user.team.length > 0 ? user.team : [];
   const [tab, setTab] = useState('team');
 
-  const { office: officeMetrics, loading: metricsLoading } = useMetrics(user);
+  // Destructure reps too so we can pass to MetricsCard for the per-rep breakdown
+  const { office: officeMetrics, reps: repMetrics, loading: metricsLoading } = useMetrics(user);
 
   const submitted    = team.filter(r => r.submitted);
   const notSubmitted = team.filter(r => !r.submitted);
@@ -139,9 +140,15 @@ export function ManagerHome({ user }) {
       {/* Weekly leaderboard */}
       {team.length > 0 && <WeeklyLeaderboard team={team} />}
 
-      {/* Office metrics */}
+      {/* Office metrics — now with collapsible per-rep breakdown */}
       {!metricsLoading && officeMetrics && (
-        <MetricsCard metrics={officeMetrics} label="Office Activation & Churn" />
+        <MetricsCard
+          metrics={officeMetrics}
+          label="Office Activation & Churn"
+          reps={repMetrics || []}
+          showRepBreakdown={true}
+          myName={user?.name}
+        />
       )}
 
       {/* Empty state */}
