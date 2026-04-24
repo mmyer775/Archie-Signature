@@ -2,7 +2,6 @@
 // App — Root component (with Admin Switcher)
 // ============================================================
 
-import { useState, useEffect } from 'react';
 import { useAuth }            from './hooks/useAuth';
 import { useAdminOverride }   from './hooks/useAdminOverride';
 import { Login }              from './components/Login';
@@ -13,22 +12,10 @@ import { APlayerView }        from './views/APlayerView';
 import { ManagerView }        from './views/ManagerView';
 import { CaptainView }        from './views/CaptainView';
 import { ROLES }              from './config';
-import { fetchRosterForOffice } from './lib/sheets';
 
 export default function App() {
   const { status, user: realUser, error, signIn, signOut, isLoading } = useAuth();
   const { override, setOverride, clearOverride, effectiveUser } = useAdminOverride(realUser);
-
-  // ── Load reps for the current office (for the rep sub-picker) ─
-  const [repsForOffice, setRepsForOffice] = useState([]);
-  useEffect(() => {
-    if (realUser?.role !== ROLES.ADMIN) return;
-    const office = override?.office || realUser.office;
-    if (!office) return;
-    fetchRosterForOffice(office)
-      .then(setRepsForOffice)
-      .catch(err => console.warn('Could not load reps for', office, err));
-  }, [realUser, override?.office]);
 
   // ── Wrap signOut so override is cleared too ───────────────────
   function handleSignOut() {
@@ -64,13 +51,13 @@ export default function App() {
         realUser={realUser}
         override={override}
         onChange={setOverride}
-        repsForOffice={repsForOffice}
+        repsForOffice={[]}
       />
     );
 
-    // The KEY prop forces a remount when office/role/rep changes,
+    // The KEY prop forces a remount when office/role changes,
     // which triggers all data hooks to re-fetch fresh data.
-    const viewKey = `${effectiveUser.office}-${effectiveUser.role}-${effectiveUser.name}`;
+    const viewKey = `${effectiveUser.office}-${effectiveUser.role}`;
 
     if (role === ROLES.ADMIN || role === ROLES.MANAGER) {
       return <ManagerView key={viewKey} user={effectiveUser} onSignOut={handleSignOut} adminSwitcher={switcher} />;
