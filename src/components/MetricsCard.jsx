@@ -2,8 +2,9 @@
 // MetricsCard — Activation & Churn metrics
 // Used on RepHome, APlayerHome, ManagerHome, CaptainHome
 //
-// Rep breakdown is collapsible — tap a rep row to expand
-// their detailed numbers.
+// Rep breakdown is a collapsible section — tap the header to
+// expand/collapse all reps, tap an individual row to see their
+// detailed numbers. Act % and Churn % headers are sortable.
 // ============================================================
 
 import { useState, useEffect } from 'react';
@@ -21,9 +22,6 @@ function fmtPct(rate) {
 }
 
 // ── useMetrics hook ──────────────────────────────────────────────────────
-// Loads { office, reps, myMetrics, teamMetrics, loading, error } for the signed-in user.
-// myMetrics: the rep's own row (for RepHome)
-// teamMetrics: summed stats across user's team (for APlayerHome)
 export function useMetrics(user) {
   const [office, setOffice]   = useState(null);
   const [reps, setReps]       = useState([]);
@@ -53,12 +51,10 @@ export function useMetrics(user) {
     return () => { cancelled = true; };
   }, [user?.email]);
 
-  // ── Rep's own row (for RepHome) ─────────────────────────────────────────
   const myMetrics = reps.find(
     r => (r.repName || '').toLowerCase().trim() === (user?.name || '').toLowerCase().trim()
   ) || null;
 
-  // ── Team aggregate (for APlayerHome) ────────────────────────────────────
   const teamNames = Array.isArray(user?.team)
     ? user.team.map(t => (typeof t === 'string' ? t : t.name)).filter(Boolean)
     : [];
@@ -187,7 +183,7 @@ function RepRow({ rep, highlight = false }) {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <div style={{ textAlign: 'right' }}>
+            <div style={{ textAlign: 'right', width: 44 }}>
               <div style={{
                 fontFamily: 'var(--font-display)',
                 fontWeight: 800,
@@ -197,9 +193,8 @@ function RepRow({ rep, highlight = false }) {
               }}>
                 {fmtPct(rep.actRate)}
               </div>
-              <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>act</div>
             </div>
-            <div style={{ textAlign: 'right' }}>
+            <div style={{ textAlign: 'right', width: 44 }}>
               <div style={{
                 fontFamily: 'var(--font-display)',
                 fontWeight: 800,
@@ -209,7 +204,6 @@ function RepRow({ rep, highlight = false }) {
               }}>
                 {fmtPct(rep.churnRate)}
               </div>
-              <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>churn</div>
             </div>
           </div>
 
@@ -257,12 +251,68 @@ function RepRow({ rep, highlight = false }) {
   );
 }
 
+// ── Sortable column header ───────────────────────────────────────────────
+function SortHeader({ label, active, direction, onClick, width }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        background: 'transparent',
+        border: 'none',
+        padding: 0,
+        margin: 0,
+        width,
+        textAlign: 'right',
+        cursor: 'pointer',
+        color: active ? '#B8A0D4' : 'var(--text-muted)',
+        fontFamily: 'var(--font-display)',
+        fontSize: 9,
+        fontWeight: 800,
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        gap: 2,
+      }}
+    >
+      {label}
+      {active && (
+        <span style={{ fontSize: 9, opacity: 0.8 }}>
+          {direction === 'desc' ? '▼' : '▲'}
+        </span>
+      )}
+    </button>
+  );
+}
+
 // ── Main MetricsCard export ──────────────────────────────────────────────
 export function MetricsCard({ metrics, label, reps = [], showRepBreakdown = false, myName = null }) {
+  const [breakdownOpen, setBreakdownOpen] = useState(false);
+  const [sortKey, setSortKey]             = useState('actRate');
+  const [sortDir, setSortDir]             = useState('desc');
+
   if (!metrics) return null;
 
   const actColor   = pctColor(metrics.actRate,   'act');
   const churnColor = pctColor(metrics.churnRate, 'churn');
+
+  // Sort reps based on current sort state
+  const sortedReps = [...reps].sort((a, b) => {
+    const av = Number(a[sortKey]) || 0;
+    const bv = Number(b[sortKey]) || 0;
+    return sortDir === 'desc' ? bv - av : av - bv;
+  });
+
+  function toggleSort(key) {
+    if (sortKey === key) {
+      // Flip direction
+      setSortDir(d => (d === 'desc' ? 'asc' : 'desc'));
+    } else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
+  }
 
   return (
     <div style={{
@@ -316,28 +366,84 @@ export function MetricsCard({ metrics, label, reps = [], showRepBreakdown = fals
         </div>
       </div>
 
+      {/* Collapsible per-rep breakdown */}
       {showRepBreakdown && reps.length > 0 && (
         <div style={{ marginTop: 16 }}>
-          <div style={{
-            fontFamily: 'var(--font-display)',
-            fontWeight: 800,
-            fontSize: 10,
-            color: 'var(--text-muted)',
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-            marginBottom: 4,
-            paddingBottom: 6,
-            borderBottom: '1px solid var(--border)',
-          }}>
-            By Rep ({reps.length})
-          </div>
-          {reps.map(rep => (
-            <RepRow
-              key={rep.repName}
-              rep={rep}
-              highlight={myName && rep.repName.toLowerCase() === myName.toLowerCase()}
-            />
-          ))}
+          {/* Section header — tap to expand/collapse */}
+          <button
+            onClick={() => setBreakdownOpen(prev => !prev)}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '8px 0',
+              background: 'transparent',
+              border: 'none',
+              borderBottom: breakdownOpen ? '1px solid var(--border)' : 'none',
+              cursor: 'pointer',
+              color: 'inherit',
+              fontFamily: 'inherit',
+            }}
+          >
+            <div style={{
+              fontFamily: 'var(--font-display)',
+              fontWeight: 800,
+              fontSize: 10,
+              color: 'var(--text-muted)',
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+            }}>
+              By Rep ({reps.length})
+            </div>
+            <div style={{
+              color: 'var(--text-muted)',
+              fontSize: 12,
+              transition: 'transform 0.2s',
+              transform: breakdownOpen ? 'rotate(90deg)' : 'none',
+            }}>
+              ›
+            </div>
+          </button>
+
+          {breakdownOpen && (
+            <>
+              {/* Sortable column headers */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: 10,
+                padding: '8px 0 6px',
+                borderBottom: '1px solid var(--border)',
+              }}>
+                <SortHeader
+                  label="Act"
+                  active={sortKey === 'actRate'}
+                  direction={sortDir}
+                  onClick={() => toggleSort('actRate')}
+                  width={44}
+                />
+                <SortHeader
+                  label="Churn"
+                  active={sortKey === 'churnRate'}
+                  direction={sortDir}
+                  onClick={() => toggleSort('churnRate')}
+                  width={44}
+                />
+                <div style={{ width: 12 }} />
+              </div>
+
+              {/* Rep rows */}
+              {sortedReps.map(rep => (
+                <RepRow
+                  key={rep.repName}
+                  rep={rep}
+                  highlight={myName && rep.repName.toLowerCase() === myName.toLowerCase()}
+                />
+              ))}
+            </>
+          )}
         </div>
       )}
     </div>
