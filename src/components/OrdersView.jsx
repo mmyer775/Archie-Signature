@@ -29,6 +29,20 @@ function statusColor(status) {
   return colors[(status || '').length % colors.length];
 }
 
+// Format ISO date strings (e.g. "2026-04-24T04:00:00.000Z") into "Apr 24, 2026"
+// Returns the original value if it's not a parseable date, so already-formatted
+// strings like "M/D/YY" pass through unchanged.
+function formatDate(value) {
+  if (!value) return value;
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value;
+  return d.toLocaleDateString('en-US', {
+    year:  'numeric',
+    month: 'short',
+    day:   'numeric',
+  });
+}
+
 function OrderCard({ order, onClick }) {
   const color = statusColor(order.status);
   return (
@@ -46,8 +60,8 @@ function OrderCard({ order, onClick }) {
         <div style={{ fontSize: 11, color: 'var(--text-muted)' }}><span style={{ color: '#B8A0D4', fontWeight: 600 }}>Rep</span> {order.repName}</div>
         <div style={{ fontSize: 11, color: 'var(--text-muted)' }}><span style={{ color: '#B8A0D4', fontWeight: 600 }}>Plan</span> {order.plan || '—'}</div>
         <div style={{ fontSize: 11, color: 'var(--text-muted)' }}><span style={{ color: '#B8A0D4', fontWeight: 600 }}>Lines</span> {order.lines || '—'}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}><span style={{ color: '#B8A0D4', fontWeight: 600 }}>Ordered</span> {order.orderDate || '—'}</div>
-        {order.activeDate && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}><span style={{ color: '#A0C4B8', fontWeight: 600 }}>Activated</span> {order.activeDate}</div>}
+        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}><span style={{ color: '#B8A0D4', fontWeight: 600 }}>Ordered</span> {formatDate(order.orderDate) || '—'}</div>
+        {order.activeDate && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}><span style={{ color: '#A0C4B8', fontWeight: 600 }}>Activated</span> {formatDate(order.activeDate)}</div>}
       </div>
     </div>
   );

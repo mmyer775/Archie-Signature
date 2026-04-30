@@ -26,6 +26,20 @@ function statusColor(s) {
   return STATUS_COLORS[s] || '#B8A0D4';
 }
 
+// Format ISO date strings (e.g. "2026-04-24T04:00:00.000Z") into "Apr 24, 2026"
+// Returns the original value if it's not a parseable date, so we don't break
+// things like "M/D/YY" strings that might already be formatted.
+function formatDate(value) {
+  if (!value) return value;
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value;
+  return d.toLocaleDateString('en-US', {
+    year:  'numeric',
+    month: 'short',
+    day:   'numeric',
+  });
+}
+
 function Field({ label, value, color }) {
   if (!value) return null;
   return (
@@ -160,7 +174,7 @@ export function OrderDetailModal({ order, user, onClose }) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
                   <Field label="REP"        value={firstLine?.repName} />
                   <Field label="OFFICE"     value={firstLine?.office} />
-                  <Field label="ORDER DATE" value={order.orderDate} />
+                  <Field label="ORDER DATE" value={formatDate(order.orderDate)} />
                   <Field label="LINES"      value={`${lines.length} line${lines.length > 1 ? 's' : ''}`} />
                 </div>
               </div>
@@ -201,7 +215,7 @@ export function OrderDetailModal({ order, user, onClose }) {
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
                         {line.plan       && <Field label="PLAN"        value={line.plan} />}
                         {line.phone      && <Field label="DEVICE"      value={line.phone} />}
-                        {line.activeDate && <Field label="ACTIVE DATE" value={line.activeDate} color="#A0C4B8" />}
+                        {line.activeDate && <Field label="ACTIVE DATE" value={formatDate(line.activeDate)} color="#A0C4B8" />}
                       </div>
                     </div>
                   );
