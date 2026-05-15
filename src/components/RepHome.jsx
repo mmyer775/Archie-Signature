@@ -227,9 +227,6 @@ export function RepHome({ user }) {
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 28, color: leaderboard.myRank === 1 ? '#E8C87A' : leaderboard.myRank <= 3 ? '#B8A0D4' : '#7B8FCE', lineHeight: 1 }}>
                 #{leaderboard.myRank}
               </div>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-display)', fontWeight: 700, marginTop: 4 }}>
-                of {leaderboard.totalActive}
-              </div>
             </div>
           ) : null}
         </div>
