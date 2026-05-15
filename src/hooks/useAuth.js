@@ -162,7 +162,7 @@ export function useAuth() {
       .filter(r =>
         (r.office || '').toLowerCase() === (rosterEntry.office || '').toLowerCase() &&
         r.status === 'active' &&
-        ['rep', 'a_player'].includes(r.role)
+        ['rep', 'a_player', 'manager'].includes(r.role)
       )
       .map(r => r.name)
       .filter(Boolean);
