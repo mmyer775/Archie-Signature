@@ -3,12 +3,13 @@ import { Layout }        from '../components/Layout';
 import { APlayerHome }   from '../components/APlayerHome';
 import { MyDay }         from '../components/MyDay';
 import { OrdersView }    from '../components/OrdersView';
-import { ArchieChat }    from '../components/ArchieChat';
+import { PlaybookView }  from '../components/PlaybookView';
 import { StrugglesFeed } from '../components/StrugglesFeed';
 import { A_PLAYER_TABS } from '../config';
 import { fetchOrders, fetchDDData } from '../api/sheets';
 
 const RATE_PER_LINE = 110;
+const ACTIVE_DAYS   = 30;
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -16,6 +17,25 @@ function parseDate(str) {
   if (!str) return null;
   const d = new Date(str);
   return isNaN(d) ? null : d;
+}
+
+function daysAgo(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+// A rep is "active" if they have at least one order in the last 30 days.
+// Active reps with no current paycheck commissions are shown as $0
+// instead of empty so managers can see who's active but not yet paid.
+function isRepActive(orders, repName) {
+  const cutoff = daysAgo(ACTIVE_DAYS);
+  return orders.some(o => {
+    if (o.repName.toLowerCase() !== repName.toLowerCase()) return false;
+    const od = parseDate(o.orderDate);
+    return od && od >= cutoff;
+  });
 }
 
 function fmtMoney(n) {
@@ -137,19 +157,34 @@ function ProjectedCard({ orders, repName, target = 10 }) {
 
 // ── Single rep collapsible block ──────────────────────────────
 
-function RepPayBlock({ repName, ddRows, orders, isMe = false }) {
+function RepPayBlock({ repName, ddRows, orders, isMe = false, isActive = false, currentDDWeek = null }) {
   const [open, setOpen] = useState(isMe); // "My" card starts open
 
-  const weeks      = groupByWeek(ddRows);
-  const latestWeek = weeks[0];
-  const history    = weeks.slice(1, 5); // 4 prior weeks
+  const weeks = groupByWeek(ddRows);
 
-  const currentAmt = latestWeek
-    ? latestWeek[1].reduce((s, r) => s + r.amount, 0) / 2
-    : 0;
-  const currentWeekKey = latestWeek?.[0];
-  const currentLines   = latestWeek
-    ? latestWeek[1].filter(r => r.clDescription === 'Port Line - OOF').length
+  // Find the rep's rows for the OFFICE'S current DD week, not their own
+  // most recent week. This way reps with $0 this week show $0, not last
+  // week's paycheck.
+  const currentWeekEntry = currentDDWeek
+    ? weeks.find(([week]) => week === currentDDWeek)
+    : weeks[0];
+
+  const currentRows = currentWeekEntry ? currentWeekEntry[1] : [];
+  const hasCurrent  = currentRows.length > 0;
+
+  // History = all weeks except the current one
+  const history = weeks
+    .filter(([week]) => week !== (currentDDWeek || currentWeekEntry?.[0]))
+    .slice(0, 4);
+
+  // Active reps with no data this week → show as $0
+  // Inactive reps with no data ever → show empty state
+  const showZero = !hasCurrent && isActive;
+
+  const currentAmt     = hasCurrent ? currentRows.reduce((s, r) => s + r.amount, 0) / 2 : 0;
+  const currentWeekKey = currentDDWeek || currentWeekEntry?.[0];
+  const currentLines   = hasCurrent
+    ? currentRows.filter(r => r.clDescription === 'Port Line - OOF').length
     : 0;
 
   const initials = repName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
@@ -182,7 +217,7 @@ function RepPayBlock({ repName, ddRows, orders, isMe = false }) {
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 14, color: 'var(--text)' }}>
             {isMe ? `${repName} (me)` : repName}
           </div>
-          {currentWeekKey && (
+          {(hasCurrent || showZero) && currentWeekKey && (
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
               DD Week {currentWeekKey}{currentLines > 0 ? ` · ${currentLines} line${currentLines !== 1 ? 's' : ''}` : ''}
             </div>
@@ -203,7 +238,7 @@ function RepPayBlock({ repName, ddRows, orders, isMe = false }) {
           {/* Current paycheck */}
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 10, fontFamily: 'var(--font-display)', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 6 }}>Current Paycheck</div>
-            {latestWeek ? (
+            {hasCurrent ? (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 26, color: accentColor }}>
@@ -219,6 +254,18 @@ function RepPayBlock({ repName, ddRows, orders, isMe = false }) {
                   )}
                 </div>
                 <PayBadge label="Paid" color={accentColor} />
+              </div>
+            ) : showZero ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 26, color: 'var(--text-muted)' }}>
+                    $0.00
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                    DD Week {currentDDWeek || '—'} · no commissions
+                  </div>
+                </div>
+                <PayBadge label="$0" color="#6B5F80" />
               </div>
             ) : (
               <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No data yet</div>
@@ -317,6 +364,19 @@ function APlayerPaycheckView({ user }) {
   const myDDRows  = ddData.filter(r => r.repName.toLowerCase() === myName.toLowerCase());
   const teamOnly  = teamNames.filter(n => n.toLowerCase() !== myName.toLowerCase());
 
+  // Current DD week = most recent ddWeek across the ENTIRE office,
+  // not per-rep. This way reps with $0 this week still show the
+  // correct current week label instead of their last paid week.
+  const currentDDWeek = (() => {
+    const weeks = [...new Set(ddData.map(r => r.ddWeek).filter(Boolean))];
+    weeks.sort((a, b) => {
+      const da = parseDate(a), db = parseDate(b);
+      if (da && db) return db - da;
+      return b.localeCompare(a);
+    });
+    return weeks[0] || null;
+  })();
+
   return (
     <div className="fade-up">
       <div className="section-header">
@@ -334,6 +394,8 @@ function APlayerPaycheckView({ user }) {
           ddRows={myDDRows}
           orders={orders}
           isMe={true}
+          isActive={isRepActive(orders, myName)}
+          currentDDWeek={currentDDWeek}
         />
       </div>
 
@@ -351,6 +413,8 @@ function APlayerPaycheckView({ user }) {
                   ddRows={repDD}
                   orders={orders}
                   isMe={false}
+                  isActive={isRepActive(orders, name)}
+                  currentDDWeek={currentDDWeek}
                 />
               );
             })}
@@ -373,7 +437,7 @@ export function APlayerView({ user, onSignOut }) {
       {tab === 'paycheck'  && <APlayerPaycheckView user={user} />}
       {tab === 'struggles' && <StrugglesFeed user={user} />}
       {tab === 'myday'     && <MyDay user={user} />}
-      {tab === 'archie'    && <ArchieChat user={user} />}
+      {tab === 'knowledge' && <PlaybookView user={user} />}
     </Layout>
   );
 }
