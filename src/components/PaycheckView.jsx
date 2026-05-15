@@ -760,6 +760,20 @@ export function PaycheckView({ user }) {
                     * subject to tax repayment and other Helen related debts
                   </div>
                 </div>
+              ) : isRepActive(orders, user?.name) ? (
+                <div className="card" style={{ marginBottom: 12, borderColor: '#6B5F8030' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                    <div>
+                      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 32, color: 'var(--text-muted)', lineHeight: 1 }}>
+                        $0.00
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
+                        No commissions for DD Week {mostRecentWeek || '—'}
+                      </div>
+                    </div>
+                    <PayBadge label="$0" color="#6B5F80" />
+                  </div>
+                </div>
               ) : (
                 <div className="card" style={{ marginBottom: 12, opacity: 0.6, textAlign: 'center', padding: '24px 16px' }}>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No paycheck data yet for this week.</div>
