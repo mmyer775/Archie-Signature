@@ -145,3 +145,10 @@ export async function fetchOrderDetail(userEmail, { customer, repName, orderDate
   const data = await callApi('fetchOrderDetail', { customer, repName, orderDate }, userEmail);
   return data || [];
 }
+
+// ── LEADERBOARD ──────────────────────────────────────────────────────────────
+
+export async function fetchLeaderboard(userEmail) {
+  const data = await callApi('fetchLeaderboard', {}, userEmail);
+  return data || { top: [], myRank: null, myWeekLines: 0, myWeekOrders: 0, totalActive: 0 };
+}
