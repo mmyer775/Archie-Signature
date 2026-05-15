@@ -1,5 +1,5 @@
 import { useState, useEffect }      from 'react';
-import { fetchNumbers }             from '../api/sheets';
+import { fetchNumbers, fetchLeaderboard } from '../api/sheets';
 import { MetricsCard, useMetrics }  from './MetricsCard';
 
 const ALL_BADGES = [
@@ -96,6 +96,17 @@ function motiveLine(streak) {
   return `${streak} days logged. Elite reps track everything. Now you see why.`;
 }
 
+// Order-count color tiers — match ManagerHome's weekly leaderboard styling.
+// 0–3: baseline blue, no glow · 4: cyan · 5–7: green · 8: yellow · 9+: hot pink
+function orderTierStyle(orders) {
+  const n = Number(orders) || 0;
+  if (n >= 9)  return { color: '#FF00E5', textShadow: '0 0 8px #FF00E5, 0 0 2px #FF00E5' };
+  if (n === 8) return { color: '#FFEA00', textShadow: '0 0 8px #FFEA00, 0 0 2px #FFEA00' };
+  if (n >= 5)  return { color: '#39FF14', textShadow: '0 0 8px #39FF14, 0 0 2px #39FF14' };
+  if (n === 4) return { color: '#00F0FF', textShadow: '0 0 8px #00F0FF, 0 0 2px #00F0FF' };
+  return { color: '#7B8FCE', textShadow: 'none' };
+}
+
 export function RepHome({ user }) {
   const firstName  = (user?.name || 'Rep').split(' ')[0];
   const earnedIds  = new Set(user?.earnedBadgeIds ?? []);
@@ -105,6 +116,7 @@ export function RepHome({ user }) {
   const [selDay,     setSelDay]     = useState(null);
   const [claimed,    setClaimed]    = useState(user?.grandPrizeClaimed ?? false);
   const [claiming,   setClaiming]   = useState(false);
+  const [leaderboard, setLeaderboard] = useState({ top: [], myRank: null, myWeekLines: 0, myWeekOrders: 0, totalActive: 0 });
 
   const today      = new Date().toLocaleDateString('en-US', { weekday: 'short' });
 
@@ -125,6 +137,20 @@ export function RepHome({ user }) {
     }
     load();
   }, [user?.email, user?.name]);
+
+  // Load weekly leaderboard (top 5 + caller's rank)
+  useEffect(() => {
+    async function loadLb() {
+      if (!user?.email) return;
+      try {
+        const lb = await fetchLeaderboard(user.email);
+        setLeaderboard(lb);
+      } catch (err) {
+        console.warn('Could not load leaderboard:', err.message);
+      }
+    }
+    loadLb();
+  }, [user?.email]);
 
   const totH  = weeklyData.reduce((a, d) => a + d.houses,  0);
   const totT  = weeklyData.reduce((a, d) => a + d.talkTos, 0);
@@ -164,7 +190,7 @@ export function RepHome({ user }) {
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', color: 'var(--text-muted)', marginBottom: 4 }}>· EARN ALL BADGES TO UNLOCK ·</div>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 17, color: allDone ? 'var(--text)' : 'var(--text-muted)', marginBottom: 4 }}>Apple Watch Series 10</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 17, color: allDone ? 'var(--text)' : 'var(--text-muted)', marginBottom: 4 }}>Apple Watch Series 11</div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
               {allDone ? (claimed ? 'Prize claimed — well earned.' : 'You did it. Claim your reward below.') : `${left} badge${left !== 1 ? 's' : ''} to go`}
             </div>
@@ -187,6 +213,86 @@ export function RepHome({ user }) {
         )}
         {claimed && <div style={{ textAlign: 'center', padding: 12, background: '#A0C4B820', border: '1px solid #A0C4B840', borderRadius: 'var(--radius-sm)', color: '#A0C4B8', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13 }}>✓ Prize claimed — your manager has been notified.</div>}
         {!allDone && <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', padding: '6px 0 2px' }}>Keep earning badges — each one gets you closer.</div>}
+      </div>
+
+      {/* Weekly rank + top 5 leaderboard */}
+      <div className="card" style={{ marginBottom: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+          <div>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 14, color: 'var(--text)' }}>My Week</div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--font-display)', fontWeight: 700 }}>Mon – Today</div>
+          </div>
+          {leaderboard.myRank ? (
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 28, color: leaderboard.myRank === 1 ? '#E8C87A' : leaderboard.myRank <= 3 ? '#B8A0D4' : '#7B8FCE', lineHeight: 1 }}>
+                #{leaderboard.myRank}
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-display)', fontWeight: 700, marginTop: 4 }}>
+                of {leaderboard.totalActive}
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: leaderboard.myRank && leaderboard.myRank <= 5 ? 16 : 0 }}>
+          <div style={{ textAlign: 'center', padding: '12px 8px', background: 'var(--bg-overlay)', borderRadius: 'var(--radius-sm)', border: '1px solid #A0C4B830' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 24, color: '#A0C4B8', lineHeight: 1 }}>{leaderboard.myWeekLines || 0}</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Lines</div>
+          </div>
+          <div style={{ textAlign: 'center', padding: '12px 8px', background: 'var(--bg-overlay)', borderRadius: 'var(--radius-sm)', border: '1px solid ' + orderTierStyle(leaderboard.myWeekOrders).color + '30' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 24, lineHeight: 1, ...orderTierStyle(leaderboard.myWeekOrders) }}>{leaderboard.myWeekOrders || 0}</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Orders</div>
+          </div>
+        </div>
+
+        {/* Top 5 list — visible only if rep is in the top 5 */}
+        {leaderboard.myRank && leaderboard.myRank <= 5 && leaderboard.top.length > 0 && (
+          <>
+            <div style={{ fontSize: 10, fontFamily: 'var(--font-display)', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>Top 5 This Week</div>
+            {(() => {
+              const topLines = leaderboard.top[0]?.weekLines || 1;
+              return leaderboard.top.map((rep, i) => {
+                const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : null;
+                const pct   = topLines > 0 ? Math.round(((rep.weekLines || 0) / topLines) * 100) : 0;
+                const isMe  = rep.name.toLowerCase().trim() === (user?.name || '').toLowerCase().trim();
+                return (
+                  <div key={i} style={{ marginBottom: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <div style={{ width: 20, textAlign: 'center', fontSize: medal ? 14 : 11, color: 'var(--text-muted)', fontFamily: 'var(--font-display)', fontWeight: 800 }}>
+                        {medal || `#${i + 1}`}
+                      </div>
+                      <div style={{ flex: 1, fontFamily: 'var(--font-display)', fontWeight: isMe ? 900 : 800, fontSize: 13, color: isMe ? '#B8A0D4' : 'var(--text)' }}>
+                        {isMe ? `${rep.name} (you)` : rep.name}
+                      </div>
+                      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 14, color: '#A0C4B8', lineHeight: 1 }}>{rep.weekLines || 0}</div>
+                          <div style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>lines</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 14, lineHeight: 1, ...orderTierStyle(rep.weekOrders) }}>{rep.weekOrders || 0}</div>
+                          <div style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>orders</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ marginLeft: 28, height: 4, background: 'var(--bg-overlay)', borderRadius: 100, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${pct}%`, background: i === 0 ? '#E8C87A' : i === 1 ? '#B8A0D4' : i === 2 ? '#7B8FCE' : 'var(--border-mid)', borderRadius: 100, transition: 'width 0.4s ease' }} />
+                    </div>
+                  </div>
+                );
+              });
+            })()}
+          </>
+        )}
+
+        {/* Not in top 5 — motivational nudge instead */}
+        {leaderboard.myRank && leaderboard.myRank > 5 && leaderboard.top.length > 0 && (
+          <div style={{ marginTop: 14, padding: '10px 14px', background: 'var(--bg-overlay)', border: '1px solid var(--border-mid)', borderRadius: 'var(--radius-sm)' }}>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-display)', fontWeight: 700, lineHeight: 1.5 }}>
+              <span style={{ color: '#A0C4B8', fontWeight: 800 }}>{Math.max((leaderboard.top[4]?.weekLines || 0) - (leaderboard.myWeekLines || 0) + 1, 1)} lines</span> to break into the top 5.
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Metrics */}
